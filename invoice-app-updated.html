@@ -1,0 +1,2429 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>براء — نظام إدارة الفواتير</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800&family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --primary:#1a6b4a;
+    --primary-light:#e4f2ec;
+    --primary-mid:#2d8f65;
+    --primary-dark:#0d3d29;
+    --accent:#f5a623;
+    --accent-light:#fff8ed;
+    --accent-dark:#c47d00;
+    --danger:#e03d3d;
+    --danger-light:#fdf0f0;
+    --info:#3b82f6;
+    --info-light:#eff6ff;
+    --bg:#f0f4f2;
+    --bg2:#e8eeeb;
+    --surface:#ffffff;
+    --surface2:#f7faf8;
+    --border:#d4e4da;
+    --border-strong:#b8d0c4;
+    --text:#0f2b1e;
+    --text-mid:#3a5a4a;
+    --text-muted:#6b8a78;
+    --shadow-sm:0 1px 4px rgba(13,61,41,0.07);
+    --shadow:0 4px 20px rgba(13,61,41,0.10);
+    --shadow-lg:0 8px 40px rgba(13,61,41,0.14);
+    --radius:10px;
+    --radius-lg:16px;
+    --radius-xl:22px;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:'Cairo',sans-serif;
+    background:var(--bg);
+    color:var(--text);
+    min-height:100vh;
+    background-image:
+      radial-gradient(ellipse at 0% 0%,rgba(26,107,74,0.06) 0%,transparent 60%),
+      radial-gradient(ellipse at 100% 100%,rgba(245,166,35,0.04) 0%,transparent 60%);
+  }
+
+  /* ══════════════ TOPBAR ══════════════ */
+  .topbar{
+    background:linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 60%,var(--primary-mid) 100%);
+    color:white;
+    padding:0 2rem;
+    display:flex;align-items:center;justify-content:space-between;
+    height:70px;
+    position:sticky;top:0;z-index:100;
+    box-shadow:0 4px 24px rgba(13,61,41,0.25);
+  }
+  .topbar::after{
+    content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);
+  }
+  .topbar-brand{display:flex;align-items:center;gap:14px;}
+  .topbar-brand .logo{
+    width:44px;height:44px;
+    background:rgba(255,255,255,0.15);
+    border:1.5px solid rgba(255,255,255,0.25);
+    border-radius:12px;
+    display:flex;align-items:center;justify-content:center;
+    font-size:22px;
+    backdrop-filter:blur(8px);
+  }
+  .topbar-brand h1{font-family:'Tajawal',sans-serif;font-size:20px;font-weight:800;letter-spacing:-0.3px;}
+  .topbar-brand p{font-size:11px;opacity:0.65;margin-top:1px;font-weight:400;}
+  .topbar-stats{display:flex;gap:6px;}
+  .topbar-stat{
+    text-align:center;
+    background:rgba(255,255,255,0.10);
+    border:1px solid rgba(255,255,255,0.15);
+    border-radius:10px;
+    padding:6px 16px;
+    min-width:90px;
+  }
+  .topbar-stat span{display:block;font-size:20px;font-weight:800;font-family:'Tajawal',sans-serif;line-height:1.1;}
+  .topbar-stat small{font-size:10px;opacity:0.65;font-weight:400;}
+
+  /* ══════════════ TABS ══════════════ */
+  .tabs{
+    display:flex;
+    background:var(--surface);
+    border-bottom:2px solid var(--border);
+    padding:0 2rem;
+    position:sticky;top:70px;z-index:99;
+    box-shadow:var(--shadow-sm);
+    gap:4px;
+  }
+  .tab-btn{
+    padding:16px 18px;border:none;background:none;cursor:pointer;
+    font-family:'Cairo',sans-serif;font-size:13.5px;font-weight:600;
+    color:var(--text-muted);
+    border-bottom:3px solid transparent;
+    margin-bottom:-2px;
+    transition:all 0.2s;
+    display:flex;align-items:center;gap:7px;
+    white-space:nowrap;
+    border-radius:8px 8px 0 0;
+  }
+  .tab-btn.active{color:var(--primary);border-bottom-color:var(--primary);background:var(--primary-light);}
+  .tab-btn:hover:not(.active){color:var(--primary);background:var(--bg);}
+
+  /* ══════════════ MAIN ══════════════ */
+  .main{padding:2rem;max-width:1280px;margin:0 auto;}
+  .panel{display:none;animation:fadeUp 0.25s ease;}
+  .panel.active{display:block;}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+  /* ══════════════ CARDS ══════════════ */
+  .card{
+    background:var(--surface);
+    border-radius:var(--radius-xl);
+    border:1px solid var(--border);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+    margin-bottom:1.5rem;
+  }
+  .card-header{
+    padding:1.25rem 1.75rem;
+    border-bottom:1px solid var(--border);
+    display:flex;align-items:center;justify-content:space-between;
+    flex-wrap:wrap;gap:10px;
+    background:var(--surface2);
+  }
+  .card-header h2{
+    font-family:'Tajawal',sans-serif;
+    font-size:16px;font-weight:700;
+    display:flex;align-items:center;gap:10px;
+    color:var(--text);
+  }
+  .card-body{padding:1.75rem;}
+
+  .section-icon{
+    width:38px;height:38px;border-radius:10px;
+    background:var(--primary-light);
+    display:inline-flex;align-items:center;justify-content:center;
+    font-size:18px;flex-shrink:0;
+  }
+
+  /* ══════════════ BUTTONS ══════════════ */
+  .btn{
+    padding:10px 22px;border-radius:10px;border:none;cursor:pointer;
+    font-family:'Cairo',sans-serif;font-size:13.5px;font-weight:700;
+    transition:all 0.18s;
+    display:inline-flex;align-items:center;gap:8px;
+    position:relative;overflow:hidden;
+  }
+  .btn::after{content:'';position:absolute;inset:0;background:rgba(255,255,255,0);transition:background 0.15s;}
+  .btn:hover::after{background:rgba(255,255,255,0.12);}
+  .btn-primary{background:linear-gradient(135deg,var(--primary),var(--primary-mid));color:white;box-shadow:0 3px 12px rgba(26,107,74,0.28);}
+  .btn-primary:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(26,107,74,0.35);}
+  .btn-secondary{background:var(--surface);color:var(--text-mid);border:1.5px solid var(--border-strong);}
+  .btn-secondary:hover{background:var(--bg2);border-color:var(--primary);color:var(--primary);}
+  .btn-accent{background:linear-gradient(135deg,var(--accent),#f7b84b);color:white;box-shadow:0 3px 12px rgba(245,166,35,0.28);}
+  .btn-accent:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(245,166,35,0.35);}
+  .btn-danger{background:var(--danger-light);color:var(--danger);border:1.5px solid #f5c6c6;}
+  .btn-danger:hover{background:var(--danger);color:white;border-color:var(--danger);}
+  .btn-sm{padding:6px 14px;font-size:12px;border-radius:8px;}
+  .btn:disabled{opacity:0.45;cursor:not-allowed;transform:none!important;box-shadow:none!important;}
+
+  /* ══════════════ FORM ══════════════ */
+  .msg-textarea{
+    width:100%;border:1.5px solid var(--border);border-radius:var(--radius);
+    padding:14px 16px;font-family:'Cairo',sans-serif;font-size:14px;
+    resize:vertical;min-height:160px;outline:none;
+    transition:border 0.2s,box-shadow 0.2s;line-height:1.9;
+    background:var(--surface);color:var(--text);
+  }
+  .msg-textarea:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,107,74,0.1);}
+  .form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;}
+  .form-group{display:flex;flex-direction:column;gap:6px;}
+  .form-group label{font-size:12.5px;font-weight:700;color:var(--text-muted);letter-spacing:0.2px;}
+  .form-control{
+    border:1.5px solid var(--border);border-radius:9px;
+    padding:9px 13px;font-family:'Cairo',sans-serif;font-size:14px;
+    outline:none;transition:border 0.2s,box-shadow 0.2s;
+    background:var(--surface);color:var(--text);
+  }
+  .form-control:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,107,74,0.1);}
+  .form-control-full{grid-column:1 / -1;}
+
+  /* ══════════════ TABLE ══════════════ */
+  .table-wrapper{overflow-x:auto;border-radius:var(--radius);}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  thead{position:sticky;top:0;z-index:1;}
+  th{
+    background:var(--primary-dark);color:rgba(255,255,255,0.9);
+    padding:11px 14px;text-align:right;font-weight:700;
+    white-space:nowrap;font-size:12px;letter-spacing:0.3px;
+  }
+  th:first-child{border-radius:0 8px 0 0;}
+  th:last-child{border-radius:8px 0 0 0;}
+  td{padding:11px 14px;border-bottom:1px solid var(--bg2);vertical-align:middle;}
+  tbody tr{transition:background 0.12s;}
+  tbody tr:hover td{background:var(--primary-light);}
+  tbody tr:last-child td{border-bottom:none;}
+  .table-actions{display:flex;gap:6px;}
+  .row-check{accent-color:var(--primary);width:16px;height:16px;cursor:pointer;}
+
+  /* ══════════════ BADGES & PILLS ══════════════ */
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700;}
+  .badge-green{background:var(--primary-light);color:var(--primary-dark);}
+  .price-badge{
+    background:linear-gradient(135deg,var(--accent-light),#fff3d6);
+    color:var(--accent-dark);
+    padding:4px 12px;border-radius:20px;
+    font-size:13px;font-weight:700;
+    display:inline-block;
+    border:1px solid rgba(245,166,35,0.2);
+  }
+
+  /* ══════════════ ALERTS ══════════════ */
+  .alert{padding:13px 18px;border-radius:var(--radius);font-size:13.5px;margin-bottom:1rem;display:flex;align-items:center;gap:10px;font-weight:500;}
+  .alert-success{background:var(--primary-light);color:var(--primary-dark);border:1px solid var(--border-strong);}
+  .alert-error{background:var(--danger-light);color:var(--danger);border:1px solid #f5c6c6;}
+  .alert-info{background:var(--accent-light);color:var(--accent-dark);border:1px solid rgba(245,166,35,0.3);}
+
+  /* ══════════════ STATS ══════════════ */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;margin-bottom:1.5rem;}
+  .stat-card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    padding:1.25rem 1rem;
+    text-align:center;
+    box-shadow:var(--shadow-sm);
+    transition:transform 0.2s,box-shadow 0.2s;
+    position:relative;overflow:hidden;
+  }
+  .stat-card::before{
+    content:'';position:absolute;top:0;left:0;right:0;height:3px;
+    background:linear-gradient(90deg,var(--primary),var(--primary-mid));
+  }
+  .stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow);}
+  .stat-card .stat-val{font-size:30px;font-weight:800;color:var(--primary);font-family:'Tajawal',sans-serif;line-height:1;}
+  .stat-card .stat-lbl{font-size:11.5px;color:var(--text-muted);margin-top:6px;font-weight:500;}
+
+  /* ══════════════ CUSTOMER CARDS ══════════════ */
+  .customers-extracted{display:flex;flex-direction:column;gap:16px;margin-top:1rem;}
+  .customer-card{
+    background:var(--surface);
+    border:1.5px solid var(--border);
+    border-radius:var(--radius-lg);
+    padding:1.5rem;
+    position:relative;
+    transition:border-color 0.2s,box-shadow 0.2s;
+    box-shadow:var(--shadow-sm);
+  }
+  .customer-card:hover{border-color:var(--primary);box-shadow:var(--shadow);}
+  .customer-card .customer-num{
+    position:absolute;top:-13px;right:18px;
+    background:linear-gradient(135deg,var(--primary-dark),var(--primary));
+    color:white;width:28px;height:28px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:800;
+    box-shadow:0 2px 8px rgba(13,61,41,0.3);
+  }
+  .customer-name{font-family:'Tajawal',sans-serif;font-size:17px;font-weight:700;color:var(--primary-dark);margin-bottom:10px;}
+  .customer-details{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;}
+  .detail-item{display:flex;align-items:flex-start;gap:6px;font-size:13px;}
+  .detail-label{color:var(--text-muted);min-width:75px;flex-shrink:0;font-weight:600;}
+  .detail-value{color:var(--text);font-weight:500;}
+
+  /* ══════════════ LOADING ══════════════ */
+  .loading{display:flex;align-items:center;gap:12px;color:var(--primary);font-size:14px;padding:1.5rem;}
+  .spinner{
+    width:22px;height:22px;
+    border:2.5px solid var(--primary-light);
+    border-top-color:var(--primary);
+    border-radius:50%;
+    animation:spin 0.7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* ══════════════ SEARCH ══════════════ */
+  .search-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;}
+  .search-input-wrap{position:relative;flex:1;min-width:200px;}
+  .search-input-wrap .search-icon{position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--text-muted);font-size:16px;}
+  .search-input-wrap input{
+    width:100%;padding:10px 40px 10px 14px;
+    border:1.5px solid var(--border);border-radius:var(--radius);
+    font-family:'Cairo',sans-serif;font-size:14px;outline:none;
+    background:var(--surface);transition:border 0.2s,box-shadow 0.2s;
+  }
+  .search-input-wrap input:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(26,107,74,0.1);}
+
+  /* ══════════════ DATE FILTER ══════════════ */
+  .date-filter{
+    display:flex;gap:14px;align-items:center;flex-wrap:wrap;
+    margin-bottom:1rem;padding:1rem 1.25rem;
+    background:var(--surface2);border-radius:var(--radius);
+    border:1px solid var(--border);
+  }
+  .date-filter label{font-size:13px;font-weight:700;color:var(--text-muted);}
+  .date-filter input[type=date]{
+    border:1.5px solid var(--border);border-radius:8px;
+    padding:7px 11px;font-family:'Cairo',sans-serif;font-size:13px;outline:none;
+    background:var(--surface);transition:border 0.2s;
+  }
+  .date-filter input[type=date]:focus{border-color:var(--primary);}
+
+  /* ══════════════ INVOICE PREVIEW ══════════════ */
+  .invoice-preview{
+    background:white;border:1px solid var(--border);
+    border-radius:var(--radius-lg);
+    padding:1.75rem;font-size:13px;
+    max-width:600px;margin:0 auto;
+    box-shadow:var(--shadow);
+  }
+  .invoice-header{text-align:center;border-bottom:2px solid var(--primary);padding-bottom:1rem;margin-bottom:1rem;}
+  .invoice-header h3{color:var(--primary-dark);font-size:22px;font-family:'Tajawal',sans-serif;font-weight:800;}
+  .invoice-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px dashed var(--border);}
+  .invoice-total{
+    font-size:16px;font-weight:800;color:var(--primary-dark);
+    display:flex;justify-content:space-between;
+    padding:12px 0;margin-top:8px;
+    border-top:2px solid var(--primary);
+    font-family:'Tajawal',sans-serif;
+  }
+
+  /* ══════════════ MODAL ══════════════ */
+  .modal-overlay{
+    display:none;position:fixed;inset:0;
+    background:rgba(10,30,20,0.55);
+    z-index:200;align-items:center;justify-content:center;
+    backdrop-filter:blur(4px);
+  }
+  .modal-overlay.open{display:flex;}
+  .modal{
+    background:var(--surface);
+    border-radius:var(--radius-xl);
+    padding:1.75rem;
+    max-width:720px;width:95%;
+    max-height:92vh;overflow-y:auto;
+    box-shadow:var(--shadow-lg);
+    border:1px solid var(--border);
+  }
+  .modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border);}
+  .modal-header h3{font-family:'Tajawal',sans-serif;font-size:18px;font-weight:800;color:var(--primary-dark);}
+  .modal-close{background:var(--bg);border:1px solid var(--border);border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-muted);transition:all 0.15s;}
+  .modal-close:hover{background:var(--danger-light);color:var(--danger);border-color:var(--danger);}
+
+  /* ══════════════ MULTI INVOICE GRID ══════════════ */
+  .inv-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-top:1rem;}
+  .inv-mini{
+    background:var(--bg);border:1.5px solid var(--border);
+    border-radius:var(--radius);padding:13px;
+    cursor:pointer;transition:all 0.15s;position:relative;
+  }
+  .inv-mini:hover{border-color:var(--primary);background:var(--primary-light);}
+  .inv-mini.selected{border-color:var(--primary);background:var(--primary-light);box-shadow:0 0 0 3px rgba(26,107,74,0.12);}
+  .inv-mini input[type=checkbox]{position:absolute;top:11px;left:11px;accent-color:var(--primary);width:16px;height:16px;}
+  .inv-mini-name{font-weight:700;font-size:14px;margin-bottom:4px;color:var(--primary-dark);}
+  .inv-mini-detail{font-size:12px;color:var(--text-muted);}
+
+  /* ══════════════ EDIT GRID ══════════════ */
+  .edit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;}
+  .edit-grid .form-group label{font-size:12px;}
+
+  /* ══════════════ NOTIFICATION ══════════════ */
+  #notification{
+    position:fixed;bottom:2rem;left:50%;transform:translateX(-50%) translateY(10px);
+    background:var(--primary-dark);color:white;
+    padding:13px 28px;border-radius:30px;
+    font-size:14px;font-weight:600;
+    z-index:999;opacity:0;
+    transition:opacity 0.25s,transform 0.25s;
+    pointer-events:none;
+    box-shadow:0 8px 32px rgba(13,61,41,0.35);
+    border:1px solid rgba(255,255,255,0.1);
+  }
+  #notification.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* ══════════════ EMPTY STATE ══════════════ */
+  .empty-state{text-align:center;padding:4rem 1rem;color:var(--text-muted);}
+  .empty-state .empty-icon{font-size:56px;margin-bottom:1rem;opacity:0.3;}
+  .empty-state p{font-size:15px;font-weight:500;}
+
+  /* ══════════════ DIVIDER ══════════════ */
+  .section-divider{height:1px;background:linear-gradient(90deg,transparent,var(--border),transparent);margin:1.5rem 0;}
+
+  /* ══════════════ RESPONSIVE ══════════════ */
+  @media(max-width:768px){
+    .main{padding:1rem;}
+    .topbar{padding:0 1rem;height:60px;}
+    .topbar-stats{display:none;}
+    .tabs{overflow-x:auto;padding:0 1rem;}
+    .card-body{padding:1.25rem;}
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="logo">✨</div>
+    <div>
+      <h1>براء</h1>
+      <p>نظام إدارة الفواتير والطلبات</p>
+    </div>
+  </div>
+  <div class="topbar-stats">
+    <div class="topbar-stat"><span id="stat-total">0</span><small>إجمالي العملاء</small></div>
+    <div class="topbar-stat"><span id="stat-today">0</span><small>إضافة اليوم</small></div>
+    <div class="topbar-stat"><span id="stat-revenue">0</span><small>المبيعات (ج)</small></div>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('extract',this)">🤖 استخراج من رسائل</button>
+  <button class="tab-btn" onclick="switchTab('manual',this)">✏️ إدخال يدوي</button>
+  <button class="tab-btn" onclick="switchTab('records',this)">📋 سجل العملاء</button>
+  <button class="tab-btn" onclick="switchTab('search',this)">🔍 البحث والتصدير</button>
+  <button class="tab-btn" onclick="switchTab('unprinted',this)">🔴 غير مطبوعة</button>
+  <button class="tab-btn" onclick="switchTab('archive',this)">🗂️ أرشيف الشيتات</button>
+</div>
+
+<div class="main">
+
+  <!-- EXTRACT PANEL -->
+  <div id="panel-extract" class="panel active">
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="section-icon">🤖</span> استخراج بيانات العملاء بالذكاء الاصطناعي</h2>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap;">
+          <div class="form-group" style="flex:1;min-width:280px;position:relative;">
+            <label>الصق رسائل العملاء هنا (يمكن لصق أكثر من رسالة في نفس الوقت)</label>
+            <div style="position:relative;">
+              <textarea class="msg-textarea" id="msg-input" placeholder="مثال:&#10;منى سليم ناصرية مركز سمنود الغربيه 01003768287 الاصفر والكشمير 2 اكس لارج السعر 800 الشحن 60&#10;&#10;ام ادم كفر الشيخ 01036090731 اصفر 2اكس السعر 400 الشحن 60"></textarea>
+              <button onclick="document.getElementById('msg-input').value=''" style="position:absolute;top:8px;left:8px;background:none;border:none;cursor:pointer;color:#e03d3d;font-size:18px;font-weight:700;line-height:1;padding:2px 6px;border-radius:6px;opacity:0.7;" title="مسح">✕</button>
+            </div>
+          </div>
+          <div class="form-group" style="width:210px;flex-shrink:0;">
+            <label>📦 نوع المنتج (يطبق على كل الرسائل)</label>
+            <select class="product-dropdown" id="global-product" style="margin-bottom:6px;">
+              <option value="">-- اختر أو أضف منتجاً --</option>
+            </select>
+            <div style="display:flex;gap:6px;">
+              <div class="input-wrap" style="flex:1;">
+                <input class="form-control" id="new-product-input" placeholder="اسم المنتج الجديد" style="font-size:12px;">
+                <button class="clear-btn" onclick="document.getElementById('new-product-input').value=''">✕</button>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="addProduct()" title="إضافة">+</button>
+            </div>
+            <small style="color:var(--text-muted);font-size:11px;margin-top:4px;display:block;">اتركه فارغاً لاستخراجه من الرسالة</small>
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="extractFromMessages()" id="extract-btn">🤖 استخراج البيانات</button>
+          <button class="btn btn-secondary" onclick="clearMessages()">🗑️ مسح</button>
+        </div>
+        <div id="extract-loading" style="display:none;" class="loading">
+          <div class="spinner"></div> جارٍ تحليل الرسائل بالذكاء الاصطناعي...
+        </div>
+        <div id="extract-error"></div>
+        <div id="extracted-list"></div>
+        <div id="save-all-bar" style="display:none;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
+          <span style="font-size:14px;color:var(--text-muted);" id="save-count"></span>
+          <button class="btn btn-primary" onclick="saveAllExtracted()">💾 حفظ جميع العملاء في قاعدة البيانات</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANUAL PANEL -->
+  <div id="panel-manual" class="panel">
+    <div class="card">
+      <div class="card-header"><h2><span class="section-icon">✏️</span> إدخال بيانات عميل يدوياً</h2></div>
+      <div class="card-body">
+        <div id="manual-alert"></div>
+        <div class="form-grid">
+          <div class="form-group"><label>اسم العميل *</label><input class="form-control" id="m-name" placeholder="الاسم الكامل"></div>
+          <div class="form-group"><label>رقم التليفون *</label><input class="form-control" id="m-phone" placeholder="01xxxxxxxxx"></div>
+          <div class="form-group"><label>المحافظة</label><input class="form-control" id="m-gov" placeholder="مثال: الغربية" oninput="autoFillShipping()"></div>
+          <div class="form-group"><label>نوع المنتج</label><input class="form-control" id="m-product" placeholder="مثال: دريس نصين"></div>
+          <div class="form-group"><label>اللون</label><input class="form-control" id="m-color" placeholder="مثال: أصفر، كشمير"></div>
+          <div class="form-group"><label>المقاس</label><input class="form-control" id="m-size" placeholder="مثال: 2XL"></div>
+          <div class="form-group"><label>عدد القطع</label><input class="form-control" type="number" id="m-qty" placeholder="1" min="1"></div>
+          <div class="form-group"><label>السعر (جنيه)</label><input class="form-control" type="number" id="m-price" placeholder="0"></div>
+          <div class="form-group"><label>الشحن (جنيه)</label><input class="form-control" type="number" id="m-shipping" placeholder="0"></div>
+          <div class="form-group"><label>الإجمالي (جنيه)</label><input class="form-control" type="number" id="m-total" placeholder="0"></div>
+          <div class="form-group form-control-full"><label>العنوان التفصيلي</label><input class="form-control" id="m-address" placeholder="العنوان كاملاً"></div>
+          <div class="form-group form-control-full"><label>ملاحظات</label><input class="form-control" id="m-notes" placeholder="أي ملاحظات إضافية"></div>
+        </div>
+        <div style="margin-top:1.5rem;display:flex;gap:10px;">
+          <button class="btn btn-primary" onclick="saveManual()">💾 حفظ العميل</button>
+          <button class="btn btn-secondary" onclick="clearManual()">🗑️ مسح</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECORDS PANEL -->
+  <div id="panel-records" class="panel">
+    <div class="stats-grid" id="records-stats"></div>
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="section-icon">📋</span> سجل العملاء</h2>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-secondary btn-sm" onclick="loadRecords()">🔄 تحديث</button>
+          <button class="btn btn-accent btn-sm" onclick="exportRecordsExcel()">📊 تصدير Excel المحددين</button>
+          <button class="btn btn-primary btn-sm" onclick="openMultiPdfModal()">🖨️ طباعة محددين PDF</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:1rem 1.5rem;">
+        <!-- Date filter -->
+        <div class="date-filter">
+          <label>📅 تصفية بالتاريخ:</label>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:13px;">من</span>
+            <input type="date" id="filter-from" onchange="loadRecords()">
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:13px;">إلى</span>
+            <input type="date" id="filter-to" onchange="loadRecords()">
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="clearDateFilter()">✕ إلغاء التصفية</button>
+        </div>
+      </div>
+      <div class="card-body" style="padding:0;">
+        <div id="records-loading" class="loading" style="padding:2rem;">
+          <div class="spinner"></div> جارٍ التحميل...
+        </div>
+        <div id="records-table"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEARCH PANEL -->
+  <div id="panel-search" class="panel">
+    <div class="card">
+      <div class="card-header"><h2><span class="section-icon">🔍</span> البحث عن عميل</h2></div>
+      <div class="card-body">
+        <div class="search-bar" style="margin-bottom:1.5rem;">
+          <div class="search-input-wrap" style="position:relative;">
+            <input type="text" id="search-name" placeholder="ابحث بالاسم..." onkeyup="searchCustomers()" style="padding-left:28px;">
+            <span class="search-icon">🔍</span>
+            <button onclick="document.getElementById('search-name').value='';searchCustomers();" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#e03d3d;font-size:15px;font-weight:700;line-height:1;padding:0;opacity:0.7;" title="مسح">✕</button>
+          </div>
+          <div class="search-input-wrap" style="position:relative;">
+            <input type="text" id="search-phone" placeholder="ابحث برقم التليفون..." onkeyup="searchCustomers()" style="padding-left:28px;" inputmode="numeric" type="tel">
+            <span class="search-icon">📞</span>
+            <button onclick="document.getElementById('search-phone').value='';searchCustomers();" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#e03d3d;font-size:15px;font-weight:700;line-height:1;padding:0;opacity:0.7;" title="مسح">✕</button>
+          </div>
+          <button class="btn btn-primary" onclick="searchCustomers()">🔍 بحث</button>
+          <button class="btn btn-secondary" onclick="openQrScanner()" title="بحث بالباركود">📷 مسح QR</button>
+        </div>
+        <div id="search-results"></div>
+        <div id="search-export-bar" style="display:none;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--border);gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn btn-accent" onclick="exportSelectedExcel()">📊 تصدير Excel جديد</button>
+          <button class="btn btn-secondary" onclick="openAddToArchiveModal()">📂 إضافة لشيت من الأرشيف</button>
+          <button class="btn btn-secondary" onclick="openCompareModal()" style="background:var(--info-light);color:var(--info);border-color:var(--info);">🔍 مقارنة مع شيت</button>
+          <button class="btn btn-primary" onclick="printSelectedPDF()">🖨️ طباعة فواتير المحددين PDF</button>
+          <button class="btn btn-danger btn-sm" id="clear-selection-btn" onclick="clearSelection()" style="display:none;">✕ مسح التحديد (${selectedIds?.size||0})</button>
+          <span id="selected-count" style="font-size:13px;color:var(--primary);font-weight:600;"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- UNPRINTED PANEL -->
+  <div id="panel-unprinted" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="section-icon">🔴</span> الفواتير غير المطبوعة</h2>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <span id="unprinted-count" style="font-size:13px;font-weight:700;color:var(--danger);"></span>
+          <button class="btn btn-primary btn-sm" onclick="printUnprintedSelected()">🖨️ طباعة PDF المحددين</button>
+          <button class="btn btn-accent btn-sm" onclick="markUnprintedSelected()">✅ تحديد كمطبوع</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="unprinted-loading" class="loading" style="display:none;"><div class="spinner"></div> جاري التحميل...</div>
+        <div id="unprinted-list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARCHIVE PANEL -->
+  <div id="panel-archive" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="section-icon">🗂️</span> أرشيف الشيتات المصدَّرة</h2>
+        <div style="display:flex;gap:10px;align-items:center;">
+          <span id="archive-count" style="font-size:13px;color:var(--text-muted);font-weight:600;"></span>
+          <button class="btn btn-danger btn-sm" onclick="clearArchive()">🗑️ حذف الكل</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div id="archive-loading" class="loading" style="display:none;"><div class="spinner"></div> جاري التحميل...</div>
+        <div id="archive-list"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- SINGLE INVOICE MODAL -->
+<div class="modal-overlay" id="invoice-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🧾 فاتورة العميل</h3>
+      <button class="modal-close" onclick="closeInvoice()">✕</button>
+    </div>
+    <div id="invoice-content"></div>
+    <div style="display:flex;gap:10px;margin-top:1rem;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="printSinglePDF()">🖨️ تحميل PDF</button>
+      <button class="btn btn-secondary" onclick="closeInvoice()">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<!-- MULTI INVOICE PDF MODAL -->
+<div class="modal-overlay" id="multi-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>🖨️ اختر العملاء لطباعة فواتيرهم</h3>
+      <button class="modal-close" onclick="document.getElementById('multi-modal').classList.remove('open')">✕</button>
+    </div>
+    <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <button class="btn btn-secondary btn-sm" onclick="toggleAllMulti(true)">تحديد الكل</button>
+      <button class="btn btn-secondary btn-sm" onclick="toggleAllMulti(false)">إلغاء الكل</button>
+      <span id="multi-count" style="font-size:13px;color:var(--text-muted);"></span>
+    </div>
+    <div id="multi-list" class="inv-grid"></div>
+    <div style="margin-top:1rem;display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="generateMultiPDF()">🖨️ طباعة الفواتير المحددة PDF</button>
+      <button class="btn btn-secondary" onclick="document.getElementById('multi-modal').classList.remove('open')">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<div id="notification"></div>
+
+<!-- QR SCANNER MODAL -->
+<div class="modal-overlay" id="qr-modal">
+  <div class="modal" style="max-width:360px;padding:1rem;">
+    <div class="modal-header" style="margin-bottom:10px;">
+      <h3 style="font-size:15px;">📷 مسح QR Code</h3>
+      <button class="modal-close" onclick="closeQrScanner()">✕</button>
+    </div>
+    <div id="qr-reader" style="width:100%;border-radius:10px;overflow:hidden;background:#000;min-height:260px;"></div>
+    <p style="margin-top:8px;font-size:12px;color:var(--text-muted);text-align:center;">الكاميرا تعمل تلقائياً — وجّهها نحو QR أي فاتورة لتحديدها</p>
+    <div id="qr-result" style="margin-top:8px;"></div>
+    <button class="btn btn-primary" style="width:100%;margin-top:10px;justify-content:center;" onclick="viewQrSelected()">
+      📋 عرض المحددين وإغلاق الكاميرا
+    </button>
+  </div>
+</div>
+
+<!-- COMPARE MODAL -->
+<div class="modal-overlay" id="compare-modal">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-header">
+      <h3>🔍 مقارنة مع شيت من الأرشيف</h3>
+      <button class="modal-close" onclick="document.getElementById('compare-modal').classList.remove('open')">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:1rem;">
+      اختر شيت من الأرشيف — سيظهر لك العملاء الموجودين في الشيت والذين لم يتم تحديدهم بعد
+    </p>
+    <div id="compare-archive-list" style="max-height:220px;overflow-y:auto;margin-bottom:1rem;border:1px solid var(--border);border-radius:var(--radius);"></div>
+    <div id="compare-result"></div>
+  </div>
+</div>
+
+<!-- ADD TO ARCHIVE MODAL -->
+<div class="modal-overlay" id="add-to-archive-modal">
+  <div class="modal" style="max-width:500px;">
+    <div class="modal-header">
+      <h3>📂 إضافة لشيت من الأرشيف</h3>
+      <button class="modal-close" onclick="document.getElementById('add-to-archive-modal').classList.remove('open')">✕</button>
+    </div>
+    <div id="archive-pick-list" style="max-height:360px;overflow-y:auto;"></div>
+  </div>
+</div>
+
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="edit-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>✏️ تعديل بيانات العميل</h3>
+      <button class="modal-close" onclick="closeEditModal()">✕</button>
+    </div>
+    <div class="edit-grid">
+      <div class="form-group"><label>👤 اسم العميل *</label><input class="form-control" id="edit-name"></div>
+      <div class="form-group"><label>📞 رقم التليفون *</label><input class="form-control" id="edit-phone"></div>
+      <div class="form-group"><label>📍 المحافظة</label><input class="form-control" id="edit-gov" oninput="autoFillEditShipping()"></div>
+      <div class="form-group"><label>🏠 العنوان</label><input class="form-control" id="edit-address"></div>
+      <div class="form-group"><label>📦 نوع المنتج</label><input class="form-control" id="edit-product"></div>
+      <div class="form-group"><label>🎨 اللون</label><input class="form-control" id="edit-color"></div>
+      <div class="form-group"><label>📐 المقاس</label><input class="form-control" id="edit-size"></div>
+      <div class="form-group"><label>🔢 عدد القطع</label><input class="form-control" type="number" id="edit-qty" min="1"></div>
+      <div class="form-group"><label>💵 السعر (جنيه)</label><input class="form-control" type="number" id="edit-price"></div>
+      <div class="form-group"><label>🚚 الشحن (جنيه)</label><input class="form-control" type="number" id="edit-shipping"></div>
+      <div class="form-group"><label>💰 الإجمالي (جنيه)</label><input class="form-control" type="number" id="edit-total"></div>
+      <div class="form-group"><label>📝 ملاحظات</label><input class="form-control" id="edit-notes"></div>
+    </div>
+    <div class="form-group" style="margin-top:14px;" id="edit-original-msg-group">
+      <label style="font-size:12.5px;font-weight:700;color:var(--text-muted);">💬 الرسالة الأصلية</label>
+      <div id="edit-original-msg-display" style="background:var(--bg2);border:1.5px solid var(--border);border-radius:9px;padding:10px 14px;font-size:13px;line-height:1.8;color:var(--text-mid);white-space:pre-wrap;max-height:150px;overflow-y:auto;display:none;"></div>
+      <div id="edit-original-msg-empty" style="font-size:12px;color:var(--text-muted);padding:8px;display:none;">لا توجد رسالة أصلية محفوظة لهذا العميل</div>
+    </div>
+    <div style="margin-top:1.25rem;display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="saveEdit()">💾 حفظ التعديلات</button>
+      <button class="btn btn-secondary" onclick="closeEditModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==================== CONFIG ====================
+const SUPABASE_URL = 'https://zdyugflxzjeaguiyurid.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXVnZmx4emplYWd1aXl1cmlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMzYxNzEsImV4cCI6MjA5NTcxMjE3MX0.INuT9aqUSOInKv-inKbqcbgLb4miZ1vWJD1Fwx5ruZc';
+const AI_PROXY = 'https://zdyugflxzjeaguiyurid.supabase.co/functions/v1/ai-proxy';
+const AI_MODEL = 'google/gemini-2.5-flash-lite';
+const TABLE = 'customers';
+
+let extractedCustomers = [];
+let currentInvoice = null;
+let searchResults = [];
+let allRecords = [];
+let selectedIds = new Map(); // id => بيانات العميل الكاملة (يحفظ عبر بحوث مختلفة)
+let printedIds = new Set();  // IDs العملاء الذين تمت طباعة فواتيرهم
+
+// ==================== UTILS ====================
+// سعر الشحن: القاهرة والجيزة 50 جنيه، باقي المحافظات 60 جنيه
+function getShipping(governorate) {
+  const gov = (governorate||'').trim();
+  return /قاهرة|القاهرة|جيزة|الجيزة/i.test(gov) ? 50 : 60;
+}
+function notify(msg, dur=3000) {
+  const n = document.getElementById('notification');
+  n.textContent = msg; n.classList.add('show');
+  setTimeout(()=>n.classList.remove('show'), dur);
+}
+function showAlert(id, msg, type='success') {
+  const icons={success:'✅',error:'❌',info:'ℹ️'};
+  document.getElementById(id).innerHTML=`<div class="alert alert-${type}">${icons[type]} ${msg}</div>`;
+  setTimeout(()=>{const el=document.getElementById(id);if(el)el.innerHTML='';},4000);
+}
+function switchTab(tab, btn) {
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+  btn.classList.add('active');
+  if(tab==='records') loadRecords();
+  if(tab==='search') document.getElementById('search-results').innerHTML='';
+  if(tab==='archive') loadArchive();
+  if(tab==='unprinted') loadUnprinted();
+}
+
+// ==================== SUPABASE ====================
+async function sbInsert(data) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+    method:'POST',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify(data)
+  });
+  if(!r.ok){const e=await r.text();throw new Error(e);}
+  return await r.json();
+}
+async function sbSelect(filter='') {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?order=created_at.desc${filter}`, {
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return await r.json();
+}
+async function sbDelete(id) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+    method:'DELETE',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+  });
+  if(!r.ok) throw new Error(await r.text());
+}
+async function sbUpdate(id, data) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+    method:'PATCH',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify(data)
+  });
+  if(!r.ok) throw new Error(await r.text());
+  return await r.json();
+}
+
+// ==================== AI EXTRACT ====================
+async function extractFromMessages() {
+  const text = document.getElementById('msg-input').value.trim();
+  if(!text){notify('⚠️ الرجاء لصق رسائل العملاء أولاً');return;}
+
+  document.getElementById('extract-btn').disabled=true;
+  document.getElementById('extract-loading').style.display='flex';
+  document.getElementById('extract-error').innerHTML='';
+  document.getElementById('extracted-list').innerHTML='';
+  document.getElementById('save-all-bar').style.display='none';
+
+  // تقسيم الرسائل بالتاريخ اللي في أول كل رسالة واتساب [DD/MM, HH:MM am/pm]
+  const BATCH_SIZE = 10;
+  const datePattern = /(?=\[\d{1,2}\/\d{1,2},\s*\d{1,2}:\d{2}\s*(am|pm|AM|PM)\])/i;
+  let messages = text.split(datePattern).map(m=>m.trim()).filter(m=>m.length>5);
+
+  // إزالة اسم المرسِل من أول كل رسالة — شكله: [20/05, 11:27 am] سلسبيل Md:
+  messages = messages.map(m=>
+    m.replace(/^\[\d{1,2}\/\d{1,2},\s*\d{1,2}:\d{2}\s*(am|pm|AM|PM)\]\s*[^:]+:\s*/i,'').trim()
+  ).filter(m=>m.length>5);
+
+  // لو ما لاقاش تاريخ — جرب السطر الفاضي
+  if(messages.length <= 1)
+    messages = text.split(/\n{2,}/).map(m=>m.trim()).filter(m=>m.length>5);
+
+  // لو لسه ما انقسمش — ابعت الكل في طلب واحد
+  if(messages.length <= 1) messages = [text];
+
+  const batches = [];
+  for(let i=0;i<messages.length;i+=BATCH_SIZE)
+    batches.push(messages.slice(i,i+BATCH_SIZE).join('\n---\n'));
+  const totalBatches = batches.length;
+
+  document.getElementById('extract-loading').innerHTML=`
+    <div class="spinner"></div>
+    <div style="flex:1;">
+      <div id="progress-text" style="font-size:13px;font-weight:600;color:var(--primary);margin-bottom:6px;">
+        جاري معالجة الدفعة 1 من ${totalBatches}...
+      </div>
+      <div style="background:var(--border);border-radius:20px;height:8px;overflow:hidden;">
+        <div id="progress-bar" style="background:linear-gradient(90deg,var(--primary),var(--primary-mid));height:100%;width:0%;transition:width 0.4s;border-radius:20px;"></div>
+      </div>
+    </div>`;
+
+  let allExtracted = [];
+
+  try {
+    for(let b=0;b<batches.length;b++){
+      document.getElementById('progress-text').textContent = `جاري معالجة الدفعة ${b+1} من ${totalBatches}...`;
+      document.getElementById('progress-bar').style.width = Math.round((b/totalBatches)*100)+'%';
+
+      const batchText = batches[b];
+      const prompt=`أنت مساعد متخصص في استخراج بيانات طلبات العملاء من الرسائل العربية غير المنتظمة.
+استخرج بيانات العملاء وأرجع JSON array فقط بدون أي نص إضافي أو backticks.
+
+الحقول المطلوبة:
+- name: اسم العميل فقط
+- phone: رقم التليفون الأول فقط بدون أي رموز
+- address: العنوان التفصيلي الكامل (شارع/حي/مدينة) بدون اسم المحافظة
+- governorate: المحافظة فقط — إذا لم تُذكر استنتجها من العنوان: "ميت غمر/المنصورة/طلخا" = الدقهلية، "طنطا/المحلة/كفر الزيات" = الغربية، "الزقازيق/العاشر/بلبيس" = الشرقية، "بنها/شبرا الخيمة/قليوب" = القليوبية، "إمبابة/الجيزة/العجوزة/الدقي/المهندسين/6 أكتوبر" = الجيزة، "مدينة نصر/مصر الجديدة/حلوان/المعادي/شبرا/عين شمس" = القاهرة، "الإسكندرية/الإسكندرية" = الإسكندرية، "أسيوط" = أسيوط، "سوهاج" = سوهاج، "قنا" = قنا، "الأقصر" = الأقصر، "أسوان" = أسوان، "المنيا" = المنيا، "دمياط" = دمياط، "كفر الشيخ" = كفر الشيخ، "البحيرة/دمنهور" = البحيرة، "المنوفية/شبين الكوم" = المنوفية، "بني سويف" = بني سويف، "الفيوم" = الفيوم.
+- color: انسخ نص طلب العميل حرفياً كما هو بدون أي تعديل أو حذف أو فصل. مثال: لو كتب "كشمير وبيبي بلو XXL" اكتب "كشمير وبيبي بلو XXL" بالضبط. لو كتب "أخضر 2XL وأصفر XL" اكتب "أخضر 2XL وأصفر XL" بالضبط. المقاس جزء من الطلب لا تحذفه أبداً.
+- size: "" (فارغ دائماً — لا تضع فيه أي شيء)
+- product_type: نوع المنتج (عباية/شميز/بنطلون...) — لو مش مذكور اتركه فارغاً
+- quantity: عدد القطع — إذا ذُكر عدد صريح ("2" أو "اثنين" أو "شميزين") استخدمه. إذا لم يُذكر احسب عدد البنود في طلب العميل
+- price: الرقم بجوار (سعر/ثمن) فقط — لو مش موجود = 0
+- shipping: الرقم بجوار (شحن/توصيل) فقط — لو مش موجود = 0
+- total_price: الرقم بجوار (إجمالي/المجموع) فقط — لو مش موجود = 0
+- notes: أي ملاحظات أخرى لا تنتمي للحقول السابقة
+- original_message: انسخ نص الرسالة كاملاً كما هو بالضبط بدون أي تعديل
+
+الرسائل:
+${batchText}
+
+أرجع JSON array فقط:
+[{"name":"اسم العميل","phone":"رقم التليفون","address":"العنوان","governorate":"المحافظة","product_type":"نوع المنتج","color":"طلب العميل كاملاً كما كتبه مثال: كشمير وبيبي بلو XXL","size":"","quantity":1,"price":0,"shipping":0,"total_price":0,"notes":""}]
+
+مهم جداً: حقل color يجب أن يحتوي على نص الطلب كاملاً كما كتبه العميل بما فيه المقاس، ولا تضع أي شيء في size.`;
+
+      const response = await fetch(AI_PROXY,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:AI_MODEL,messages:[{role:'user',content:prompt}]})
+      });
+      if(!response.ok) throw new Error('فشل الاتصال بـ OpenRouter: '+response.status);
+      const data = await response.json();
+      let content = data.choices[0].message.content.trim();
+      content = content.replace(/```json/gi,'').replace(/```/g,'').trim();
+
+      let parsed;
+      try { parsed = JSON.parse(content); }
+      catch(e) {
+        const m = content.match(/\[[\s\S]*\]/);
+        if(m) try { parsed = JSON.parse(m[0]); } catch(e2) {}
+        if(!parsed){ console.warn(`دفعة ${b+1} فشلت`); continue; }
+      }
+
+      const batchResults = Array.isArray(parsed) ? parsed : [parsed];
+      const fixed = batchResults.map(c => {
+        const govShipping = getShipping(c.governorate);
+        const aiPrice    = c.price    || 0;
+        const aiShipping = c.shipping || 0;
+        const aiTotal    = c.total_price || 0;
+        let price, shipping, total;
+        if(aiShipping > 0 && aiPrice > 0) {
+          price=aiPrice; shipping=aiShipping; total=aiPrice+aiShipping;
+        } else if(aiShipping > 0 && aiTotal > 0) {
+          shipping=aiShipping; total=aiTotal; price=aiTotal-aiShipping;
+        } else if(aiTotal > 0) {
+          shipping=govShipping; total=aiTotal; price=aiTotal-govShipping;
+        } else if(aiPrice > 0) {
+          shipping=govShipping; total=aiPrice+govShipping; price=aiPrice;
+        } else {
+          shipping=govShipping; price=0; total=0;
+        }
+        return {...c, price, shipping, total_price: total};
+      });
+
+      allExtracted = allExtracted.concat(fixed);
+
+      // تطبيق نوع المنتج العام لو مكتوب
+      const globalProduct = document.getElementById('global-product').value.trim();
+      if(globalProduct) {
+        allExtracted = allExtracted.map(c => ({...c, product_type: globalProduct}));
+      }
+
+      extractedCustomers = allExtracted;
+      renderExtracted();
+    }
+
+    document.getElementById('progress-bar').style.width='100%';
+    document.getElementById('progress-text').textContent=`✅ تم معالجة ${totalBatches} دفعة — ${allExtracted.length} عميل`;
+
+  } catch(err) {
+    document.getElementById('extract-error').innerHTML=`<div class="alert alert-error" style="margin-top:1rem;">❌ خطأ: ${err.message}</div>`;
+  } finally {
+    document.getElementById('extract-btn').disabled=false;
+    document.getElementById('extract-loading').style.display='none';
+  }
+}
+function renderExtracted() {
+  if(!extractedCustomers.length){
+    document.getElementById('extracted-list').innerHTML='<div class="alert alert-info" style="margin-top:1rem;">⚠️ لم يتم استخراج أي بيانات</div>';
+    return;
+  }
+  let html=`<div style="margin-top:1.5rem;"><div class="alert alert-success">✅ تم استخراج ${extractedCustomers.length} عميل بنجاح</div>`;
+  html+=`<div class="customers-extracted">`;
+  extractedCustomers.forEach((c,i)=>{
+    html+=`<div class="customer-card">
+      <div class="customer-num">${i+1}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div class="customer-name" style="margin-bottom:0;">👤 ${c.name||'غير محدد'}</div>
+        <button class="btn btn-secondary btn-sm" onclick="openEditExtracted(${i})">✏️ تعديل</button>
+      </div>
+      <div class="customer-details">
+        <div class="detail-item"><span class="detail-label">📞 التليفون:</span><span class="detail-value">${c.phone||'-'}</span></div>
+        <div class="detail-item"><span class="detail-label">📍 المحافظة:</span><span class="detail-value">${c.governorate||'-'}</span></div>
+        <div class="detail-item"><span class="detail-label">🏠 العنوان:</span><span class="detail-value">${c.address||'-'}</span></div>
+        <div class="detail-item"><span class="detail-label">📦 المنتج:</span><span class="detail-value">${c.product_type||'-'}</span></div>
+        <div class="detail-item"><span class="detail-label">🎨 الطلب:</span><span class="detail-value">${c.color||'-'}</span></div>
+        <div class="detail-item"><span class="detail-label">🔢 الكمية:</span><span class="detail-value">${c.quantity||1} قطعة</span></div>
+        <div class="detail-item"><span class="detail-label">💰 الإجمالي:</span><span class="detail-value"><span class="price-badge">${c.total_price||0} جنيه</span></span></div>
+      </div>
+    </div>`;
+  });
+  html+=`</div></div>`;
+  document.getElementById('extracted-list').innerHTML=html;
+  const bar=document.getElementById('save-all-bar');
+  bar.style.display='flex';
+  document.getElementById('save-count').textContent=`${extractedCustomers.length} عميل جاهز للحفظ`;
+}
+
+async function saveAllExtracted() {
+  if(!extractedCustomers.length) return;
+  try {
+    for(const c of extractedCustomers) await sbInsert(c);
+    notify(`✅ تم حفظ ${extractedCustomers.length} عميل بنجاح!`);
+    extractedCustomers=[];
+    document.getElementById('extracted-list').innerHTML='';
+    document.getElementById('save-all-bar').style.display='none';
+    updateTopStats();
+  } catch(err){notify('❌ خطأ في الحفظ: '+err.message);}
+}
+
+function clearMessages() {
+  document.getElementById('msg-input').value='';
+  document.getElementById('extracted-list').innerHTML='';
+  document.getElementById('save-all-bar').style.display='none';
+  document.getElementById('extract-error').innerHTML='';
+  extractedCustomers=[];
+}
+
+function autoFillShipping() {
+  const gov = document.getElementById('m-gov').value;
+  const shipping = getShipping(gov);
+  document.getElementById('m-shipping').value = shipping;
+  // إعادة حساب الإجمالي تلقائياً
+  const price = parseFloat(document.getElementById('m-price').value)||0;
+  document.getElementById('m-total').value = price + shipping;
+}
+
+// ==================== MANUAL ====================
+function saveManual() {
+  const name=document.getElementById('m-name').value.trim();
+  const phone=document.getElementById('m-phone').value.trim();
+  if(!name||!phone){showAlert('manual-alert','الاسم ورقم التليفون مطلوبان','error');return;}
+  const gov=document.getElementById('m-gov').value.trim()||null;
+  const price=parseFloat(document.getElementById('m-price').value)||0;
+  const shipping=getShipping(gov); // دائماً من القاعدة الثابتة
+  const total=price+shipping;
+  const data={name,phone,
+    governorate:gov,
+    product_type:document.getElementById('m-product').value.trim()||null,
+    color:document.getElementById('m-color').value.trim()||null,
+    size:document.getElementById('m-size').value.trim()||null,
+    quantity:parseInt(document.getElementById('m-qty').value)||1,
+    price,shipping,total_price:total,
+    address:document.getElementById('m-address').value.trim()||null,
+    notes:document.getElementById('m-notes').value.trim()||null
+  };
+  sbInsert(data).then(()=>{
+    showAlert('manual-alert',`تم حفظ العميل "${name}" بنجاح ✅`,'success');
+    clearManual(); updateTopStats();
+  }).catch(err=>showAlert('manual-alert','خطأ: '+err.message,'error'));
+}
+function clearManual() {
+  ['m-name','m-phone','m-gov','m-product','m-color','m-size','m-qty','m-price','m-shipping','m-total','m-address','m-notes']
+    .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+}
+
+// ==================== RECORDS ====================
+async function loadRecords() {
+  document.getElementById('records-loading').style.display='flex';
+  document.getElementById('records-table').innerHTML='';
+  try {
+    let filter='';
+    const from=document.getElementById('filter-from').value;
+    const to=document.getElementById('filter-to').value;
+    if(from) filter+=`&created_at=gte.${from}T00:00:00`;
+    if(to)   filter+=`&created_at=lte.${to}T23:59:59`;
+    const data = await sbSelect(filter);
+    allRecords=data;
+    renderRecords(data);
+    renderRecordStats(data);
+    updateTopStatsFrom(data);
+  } catch(err){
+    document.getElementById('records-table').innerHTML=`<div class="alert alert-error" style="margin:1rem;">❌ خطأ: ${err.message}</div>`;
+  } finally {
+    document.getElementById('records-loading').style.display='none';
+  }
+}
+
+function clearDateFilter() {
+  document.getElementById('filter-from').value='';
+  document.getElementById('filter-to').value='';
+  loadRecords();
+}
+
+function renderRecordStats(data) {
+  const total=data.length;
+  const revenue=data.reduce((s,r)=>s+(r.total_price||0),0);
+  const govs=[...new Set(data.map(r=>r.governorate).filter(Boolean))].length;
+  document.getElementById('records-stats').innerHTML=`
+    <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-lbl">إجمالي العملاء</div></div>
+    <div class="stat-card"><div class="stat-val">${revenue.toLocaleString()}</div><div class="stat-lbl">إجمالي المبيعات (جنيه)</div></div>
+    <div class="stat-card"><div class="stat-val">${govs}</div><div class="stat-lbl">محافظات مختلفة</div></div>`;
+}
+
+function renderRecords(data) {
+  if(!data.length){
+    document.getElementById('records-table').innerHTML='<div class="empty-state"><div class="empty-icon">📭</div><p>لا يوجد عملاء في هذه الفترة</p></div>';
+    return;
+  }
+
+  // كشف أرقام التليفون المكررة
+  const phoneCounts={};
+  data.forEach(r=>{ if(r.phone) phoneCounts[r.phone]=(phoneCounts[r.phone]||0)+1; });
+
+  let html=`<div class="table-wrapper"><table>
+    <thead><tr>
+      <th><input type="checkbox" class="row-check" id="rec-check-all" onchange="toggleRecordChecks(this)"></th>
+      <th>#</th><th>الاسم</th><th>التليفون</th><th>المحافظة</th>
+      <th>المنتج</th><th>اللون/المقاس</th><th>الكمية</th><th>الإجمالي</th><th>إجراءات</th>
+    </tr></thead><tbody>`;
+  data.forEach((r,i)=>{
+    const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('ar-EG') : '-';
+    const isDuplicate = r.phone && phoneCounts[r.phone] > 1;
+    const isPrinted = r.printed || printedIds.has(r.id);
+    const rowBg = isPrinted ? 'style="background:#e8f0fe;"' : isDuplicate ? 'style="background:#fff8e1;"' : '';
+    const dupBadge = isDuplicate ? ' <span style="background:#ff9800;color:white;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700;">مكرر</span>' : '';
+    const printedBadge = isPrinted ? ' <span style="background:#4a90d9;color:white;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700;">✓ مطبوع</span>' : '';
+    html+=`<tr ${rowBg}>
+      <td><input type="checkbox" class="row-check rec-check" data-idx="${i}" onchange="updateMultiCount()"></td>
+      <td>${i+1}</td>
+      <td><strong>${r.name}</strong>${dupBadge}${printedBadge}<br><small style="color:var(--text-muted);font-size:11px;">${dateStr}</small></td>
+      <td>${r.phone||'-'}</td>
+      <td><span class="badge badge-green">${r.governorate||'-'}</span></td>
+      <td>${r.product_type||'-'}</td>
+      <td>${[r.color,r.size].filter(Boolean).join(' / ')||'-'}</td>
+      <td>${r.quantity||1}</td>
+      <td><span class="price-badge">${(r.total_price||0).toLocaleString()} ج</span></td>
+      <td><div class="table-actions">
+        <button class="btn btn-secondary btn-sm" onclick='showInvoice(${JSON.stringify(r)})'>🧾</button>
+        <button class="btn btn-secondary btn-sm" onclick="openEditRecord(${i})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteRecord(${r.id},'${r.name.replace(/'/g,"\\'")}')">🗑️</button>
+      </div></td>
+    </tr>`;
+  });
+  html+='</tbody></table></div>';
+  document.getElementById('records-table').innerHTML=html;
+}
+
+function toggleRecordChecks(el) {
+  document.querySelectorAll('.rec-check').forEach(c=>c.checked=el.checked);
+  updateMultiCount();
+}
+function updateMultiCount() {
+  const n=document.querySelectorAll('.rec-check:checked').length;
+}
+
+async function deleteRecord(id,name) {
+  if(!confirm(`هل تريد حذف العميل "${name}"؟`)) return;
+  try{ await sbDelete(id); notify('🗑️ تم الحذف'); loadRecords(); }
+  catch(err){ notify('❌ خطأ في الحذف'); }
+}
+
+// ==================== MULTI PDF FROM RECORDS ====================
+function openMultiPdfModal() {
+  if(!allRecords.length){notify('⚠️ لا يوجد عملاء لعرضهم');return;}
+  // Use checked records if any, otherwise show all
+  const checked=[...document.querySelectorAll('.rec-check:checked')].map(c=>parseInt(c.dataset.idx));
+  const pool=checked.length>0 ? checked.map(i=>allRecords[i]) : allRecords;
+  let html='';
+  pool.forEach((r,i)=>{
+    html+=`<div class="inv-mini" id="imini-${i}" onclick="toggleMini(${i})">
+      <input type="checkbox" class="mini-check" id="mc-${i}" checked onchange="updateMiniCount()">
+      <div class="inv-mini-name" style="margin-right:24px;">${r.name}</div>
+      <div class="inv-mini-detail">${r.phone||''} | ${r.governorate||''} | ${(r.total_price||0).toLocaleString()} ج</div>
+    </div>`;
+  });
+  document.getElementById('multi-list').innerHTML=html;
+  document.getElementById('multi-list').dataset.pool=JSON.stringify(pool);
+  updateMiniCount();
+  document.getElementById('multi-modal').classList.add('open');
+}
+
+function toggleMini(i) {
+  const cb=document.getElementById('mc-'+i);
+  cb.checked=!cb.checked;
+  document.getElementById('imini-'+i).classList.toggle('selected',cb.checked);
+  updateMiniCount();
+}
+function toggleAllMulti(val) {
+  document.querySelectorAll('.mini-check').forEach((c,i)=>{
+    c.checked=val;
+    document.getElementById('imini-'+i)?.classList.toggle('selected',val);
+  });
+  updateMiniCount();
+}
+function updateMiniCount() {
+  const n=document.querySelectorAll('.mini-check:checked').length;
+  document.getElementById('multi-count').textContent=n?`تم تحديد ${n} عميل`:'';
+}
+
+function generateMultiPDF() {
+  const pool=JSON.parse(document.getElementById('multi-list').dataset.pool||'[]');
+  const selected=[...document.querySelectorAll('.mini-check')].map((c,i)=>c.checked?pool[i]:null).filter(Boolean);
+  if(!selected.length){notify('⚠️ اختر عميلاً واحداً على الأقل');return;}
+  buildMultiPagePDF(selected);
+  document.getElementById('multi-modal').classList.remove('open');
+}
+
+// ==================== QR SCANNER ====================
+let qrScanner = null;
+let lastScannedId = null;
+let isProcessingQr = false; // نمنع معالجة QR جديد أثناء معالجة القديم
+
+function playBeep() {
+  try {
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.value = 1800;
+    osc.type = 'square';
+    gain.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.15);
+  } catch(e){}
+}
+
+function playWarningBeep() {
+  // بازر إنذار — نبضتين متنازلتين
+  try {
+    const ctx = new (window.AudioContext||window.webkitAudioContext)();
+    [0, 0.2].forEach((delay, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = i === 0 ? 600 : 400;
+      osc.type = 'sawtooth';
+      gain.gain.setValueAtTime(0.4, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.18);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.18);
+    });
+  } catch(e){}
+}
+
+function openQrScanner() {
+  document.getElementById('qr-modal').classList.add('open');
+  document.getElementById('qr-result').innerHTML='';
+  document.getElementById('qr-reader').innerHTML='';
+  lastScannedId = null;
+  isProcessingQr = false;
+  setTimeout(startQrCamera, 300);
+}
+
+function startQrCamera() {
+  qrScanner = new Html5Qrcode('qr-reader');
+  qrScanner.start(
+    {facingMode:'environment'},
+    {fps:15, qrbox:{width:220,height:220}, aspectRatio:1.0},
+    (decodedText) => {
+      // تجاهل لو نفس الـ QR أو لسه بيعالج
+      if(decodedText === lastScannedId || isProcessingQr) return;
+      lastScannedId = decodedText;
+      isProcessingQr = true;
+
+      // صوت واهتزاز فوري
+      if(navigator.vibrate) navigator.vibrate(120);
+      playBeep();
+
+      // معالجة بدون إيقاف الكاميرا
+      handleQrResult(decodedText).finally(()=>{
+        // السماح بـ QR جديد بعد ثانيتين
+        setTimeout(()=>{
+          lastScannedId = null;
+          isProcessingQr = false;
+        }, 2000);
+      });
+    },
+    () => {}
+  ).catch(()=>{
+    document.getElementById('qr-result').innerHTML=
+      '<div class="alert alert-error">❌ لا يمكن الوصول للكاميرا</div>';
+  });
+}
+
+async function closeQrScanner() {
+  if(qrScanner) {
+    try { await qrScanner.stop(); } catch(e){}
+    qrScanner = null;
+  }
+  document.getElementById('qr-modal').classList.remove('open');
+  document.getElementById('qr-reader').innerHTML='';
+  lastScannedId = null;
+  isProcessingQr = false;
+}
+
+async function viewQrSelected() {
+  await closeQrScanner();
+  if(!selectedIds.size){ notify('⚠️ لم يتم تحديد أي عميل'); return; }
+  switchTab('search', document.querySelectorAll('.tab-btn')[3]);
+  searchResults = [...selectedIds.values()];
+  renderSearchResults(searchResults);
+  notify(`✅ ${selectedIds.size} عميل محدد`);
+}
+
+async function handleQrResult(text) {
+  const resultEl = document.getElementById('qr-result');
+  resultEl.innerHTML='<div class="loading" style="font-size:12px;padding:6px;"><div class="spinner" style="width:14px;height:14px;"></div> جاري البحث...</div>';
+  try {
+    let customer = null;
+    if(text.startsWith('INVOICE:')) {
+      const id = parseInt(text.replace('INVOICE:',''));
+      const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+        headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+      });
+      const data = await r.json();
+      customer = data[0]||null;
+    } else if(text.startsWith('INV:')) {
+      const parts = text.split(':');
+      const phone = parts[2]||'';
+      if(phone){
+        const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?phone=eq.${encodeURIComponent(phone)}&limit=1`, {
+          headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+        });
+        const data = await r.json();
+        customer = data[0]||null;
+      }
+    }
+
+    if(customer) {
+      // كشف التكرار — لو العميل محدد مسبقاً
+      if(selectedIds.has(customer.id)) {
+        if(navigator.vibrate) navigator.vibrate([100,50,100]);
+        playWarningBeep();
+        resultEl.innerHTML=`
+          <div style="background:#fff8e1;border:2px solid #f0a500;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;color:#8a5000;">
+            ⚠️ محدد مسبقاً: ${customer.name}
+            <div style="font-size:11px;font-weight:400;margin-top:2px;">هذا العميل تم تحديده من قبل</div>
+          </div>`;
+      } else {
+        // عميل جديد — تحديد تلقائي
+        selectedIds.set(customer.id, customer);
+        updateSelectedCount();
+        resultEl.innerHTML=`
+          <div style="background:#e4f2ec;border:1px solid #1a6b4a;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;color:#0f4a33;">
+            ✅ ${customer.name}
+            <span style="font-weight:400;color:#3a5a4a;"> | المحددين: ${selectedIds.size}</span>
+          </div>`;
+      }
+    } else {
+      resultEl.innerHTML=`<div style="background:#fdf0f0;border:1px solid #e03d3d;border-radius:8px;padding:6px 10px;font-size:12px;color:#e03d3d;">⚠️ لم يتم العثور على العميل</div>`;
+    }
+  } catch(err){
+    resultEl.innerHTML=`<div class="alert alert-error" style="font-size:12px;">❌ خطأ: ${err.message}</div>`;
+  }
+}
+
+// ==================== COMPARE WITH ARCHIVE ====================
+async function openCompareModal() {
+  const modal = document.getElementById('compare-modal');
+  const list  = document.getElementById('compare-archive-list');
+  document.getElementById('compare-result').innerHTML = '';
+  list.innerHTML = '<div class="loading"><div class="spinner"></div> جاري تحميل الأرشيف...</div>';
+  modal.classList.add('open');
+
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?order=created_at.desc`, {
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+    });
+    const archives = await r.json();
+    if(!archives.length){
+      list.innerHTML='<div class="empty-state" style="padding:1.5rem;"><div class="empty-icon" style="font-size:32px;">🗂️</div><p>لا يوجد شيتات في الأرشيف بعد</p></div>';
+      return;
+    }
+    list.innerHTML = archives.map(a=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-bottom:1px solid var(--border);gap:10px;">
+        <div>
+          <div style="font-weight:700;font-size:13px;">📊 ${a.filename}</div>
+          <div style="font-size:11px;color:var(--text-muted);">${a.day_name} — ${a.export_date} | ${a.records_count} عميل</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="runCompare(${a.id})">مقارنة</button>
+      </div>`).join('');
+  } catch(err){
+    list.innerHTML=`<div class="alert alert-error">❌ خطأ: ${err.message}</div>`;
+  }
+}
+
+async function runCompare(archiveId) {
+  const resultEl = document.getElementById('compare-result');
+  resultEl.innerHTML='<div class="loading"><div class="spinner"></div> جاري المقارنة...</div>';
+
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=eq.${archiveId}`, {
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+    });
+    const rows = await r.json();
+    if(!rows.length){ resultEl.innerHTML='<div class="alert alert-error">❌ لم يتم العثور على الشيت</div>'; return; }
+
+    const archive = rows[0];
+    const archiveData = archive.data || [];
+
+    // العملاء في الشيت
+    const archiveIds = new Set(archiveData.map(c => c.id).filter(Boolean));
+
+    // العملاء المحددين دلوقتي
+    const selectedIdsSet = new Set(selectedIds.keys());
+
+    // الناقصين = موجودين في الشيت بس مش محددين
+    const missing = archiveData.filter(c => c.id && !selectedIdsSet.has(c.id));
+
+    // المحددين وموجودين في الشيت
+    const matched = archiveData.filter(c => c.id && selectedIdsSet.has(c.id));
+
+    // محددين بس مش في الشيت
+    const extra = [...selectedIds.values()].filter(c => !archiveIds.has(c.id));
+
+    let html = `
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1rem;text-align:center;">
+        <div style="background:#e4f2ec;border-radius:8px;padding:10px;">
+          <div style="font-size:22px;font-weight:800;color:#1a6b4a;">${matched.length}</div>
+          <div style="font-size:11px;color:#3a5a4a;">✅ محددين في الشيت</div>
+        </div>
+        <div style="background:#fdf0f0;border-radius:8px;padding:10px;">
+          <div style="font-size:22px;font-weight:800;color:#e03d3d;">${missing.length}</div>
+          <div style="font-size:11px;color:#c02020;">❌ ناقصين (في الشيت غير محددين)</div>
+        </div>
+        <div style="background:#fff8e1;border-radius:8px;padding:10px;">
+          <div style="font-size:22px;font-weight:800;color:#f0a500;">${extra.length}</div>
+          <div style="font-size:11px;color:#8a5000;">➕ محددين مش في الشيت</div>
+        </div>
+      </div>`;
+
+    if(missing.length) {
+      html += `<div style="font-weight:700;font-size:13px;margin-bottom:8px;color:#e03d3d;">❌ العملاء الناقصون (${missing.length}):</div>
+        <div style="border:1.5px solid #f5c6c6;border-radius:8px;overflow:hidden;margin-bottom:10px;">`;
+      missing.forEach((c,i) => {
+        html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;${i%2===0?'background:#fdf7f7;':'background:white;'}border-bottom:1px solid #fde8e8;">
+          <div>
+            <span style="font-weight:700;font-size:13px;">👤 ${c.name}</span>
+            <span style="font-size:11px;color:#999;margin-right:8px;">${c.phone||''}</span>
+            <span style="font-size:11px;color:#999;">${c.governorate||''}</span>
+          </div>
+          <button class="btn btn-primary btn-sm" onclick="selectMissingCustomer(${c.id})">تحديد</button>
+        </div>`;
+      });
+      html += `</div>
+        <button class="btn btn-primary" style="width:100%;" onclick="selectAllMissing(${archiveId})">
+          ✅ تحديد كل الناقصين (${missing.length})
+        </button>`;
+    } else {
+      html += '<div class="alert alert-success">✅ كل عملاء الشيت تم تحديدهم!</div>';
+    }
+
+    resultEl.innerHTML = html;
+    // حفظ الناقصين للاستخدام لاحقاً
+    window._missingCustomers = missing;
+  } catch(err){
+    resultEl.innerHTML=`<div class="alert alert-error">❌ خطأ: ${err.message}</div>`;
+  }
+}
+
+function selectMissingCustomer(id) {
+  const customer = (window._missingCustomers||[]).find(c=>c.id===id);
+  if(customer){
+    selectedIds.set(id, customer);
+    updateSelectedCount();
+    notify(`✅ تم تحديد: ${customer.name}`);
+    // تحديث الزر
+    event.target.textContent = '✓ محدد';
+    event.target.disabled = true;
+    event.target.style.opacity = '0.5';
+  }
+}
+
+function selectAllMissing(archiveId) {
+  (window._missingCustomers||[]).forEach(c => {
+    if(c.id) selectedIds.set(c.id, c);
+  });
+  updateSelectedCount();
+  notify(`✅ تم تحديد ${(window._missingCustomers||[]).length} عميل ناقص`);
+  document.getElementById('compare-modal').classList.remove('open');
+}
+
+// ==================== EXPORT TO EXISTING EXCEL ====================
+async function openAddToArchiveModal() {
+  if(!selectedIds.size){ notify('⚠️ اختر عملاء أولاً'); return; }
+  const modal = document.getElementById('add-to-archive-modal');
+  const list  = document.getElementById('archive-pick-list');
+  list.innerHTML = '<div class="loading"><div class="spinner"></div> جاري تحميل الأرشيف...</div>';
+  modal.classList.add('open');
+
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?order=created_at.desc`, {
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+    });
+    const archives = await r.json();
+    if(!archives.length){
+      list.innerHTML='<div class="empty-state"><div class="empty-icon">🗂️</div><p>لا يوجد شيتات في الأرشيف بعد</p></div>';
+      return;
+    }
+    list.innerHTML = archives.map(a=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--border);gap:10px;">
+        <div>
+          <div style="font-weight:700;font-size:14px;">📊 ${a.filename}</div>
+          <div style="font-size:12px;color:var(--text-muted);">${a.day_name} — ${a.export_date} | ${a.records_count} عميل</div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="addToArchiveSheet(${a.id})">إضافة</button>
+      </div>`).join('');
+  } catch(err){
+    list.innerHTML=`<div class="alert alert-error">❌ خطأ: ${err.message}</div>`;
+  }
+}
+
+async function addToArchiveSheet(archiveId) {
+  const selected = [...selectedIds.values()];
+  try {
+    // جيب الشيت القديم من الأرشيف
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=eq.${archiveId}`, {
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+    });
+    const rows = await r.json();
+    if(!rows.length){ notify('⚠️ لم يتم العثور على الشيت'); return; }
+    const archive = rows[0];
+
+    // ادمج البيانات القديمة مع الجديدة
+    const mergedData = [...archive.data, ...selected];
+
+    // حدّث الأرشيف في قاعدة البيانات
+    await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=eq.${archiveId}`, {
+      method:'PATCH',
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},
+      body: JSON.stringify({
+        data: mergedData,
+        records_count: mergedData.length
+      })
+    });
+
+    // حمّل الشيت المحدث
+    downloadExcel(mergedData, archive.filename);
+    document.getElementById('add-to-archive-modal').classList.remove('open');
+    notify(`✅ تم إضافة ${selected.length} عميل للشيت "${archive.filename}"`);
+  } catch(err){
+    notify('❌ خطأ: ' + err.message);
+  }
+}
+
+function openEditFromSearch(id) {
+  const customer = searchResults.find(r => r.id === id);
+  if(!customer){ notify('⚠️ لم يتم العثور على العميل'); return; }
+  const idx = allRecords.findIndex(r => r.id === id);
+  if(idx >= 0) openEditRecord(idx);
+  else {
+    // لو مش في allRecords نحمله مباشرة
+    editMode='record'; editIndex=-1; editRecordId=id;
+    fillEditModal(customer);
+    document.getElementById('edit-modal').classList.add('open');
+  }
+}
+
+// ==================== SEARCH ====================
+async function searchCustomers() {
+  const name=document.getElementById('search-name').value.trim();
+  const phone=document.getElementById('search-phone').value.trim();
+  if(!name&&!phone){document.getElementById('search-results').innerHTML='';return;}
+  let filter='';
+  if(name&&phone) filter=`&or=(name.ilike.*${encodeURIComponent(name)}*,phone.ilike.*${encodeURIComponent(phone)}*)`;
+  else if(name) filter=`&name=ilike.*${encodeURIComponent(name)}*`;
+  else filter=`&phone=ilike.*${encodeURIComponent(phone)}*`;
+  try{
+    searchResults=await sbSelect(filter);
+    renderSearchResults(searchResults);
+  } catch(err){notify('❌ خطأ في البحث');}
+}
+
+function renderSearchResults(data) {
+  const bar=document.getElementById('search-export-bar');
+  if(!data.length){
+    document.getElementById('search-results').innerHTML='<div class="alert alert-info">🔍 لا توجد نتائج</div>';
+    bar.style.display='none';return;
+  }
+  let html=`<div class="table-wrapper"><table>
+    <thead><tr>
+      <th><input type="checkbox" class="row-check" id="check-all" onchange="toggleAllChecks(this)"></th>
+      <th>#</th><th>الاسم</th><th>التليفون</th><th>المحافظة</th>
+      <th>المنتج</th><th>الكمية</th><th>الإجمالي</th><th>إجراءات</th>
+    </tr></thead><tbody>`;
+  data.forEach((r,i)=>{
+    const isChecked = selectedIds.has(r.id) ? 'checked' : '';
+    const rowBg = selectedIds.has(r.id) ? 'style="background:#e8f5f0;"' : '';
+    html+=`<tr ${rowBg}>
+      <td><input type="checkbox" class="row-check result-check" data-id="${r.id}" ${isChecked} onchange="onResultCheck(this)"></td>
+      <td>${i+1}</td><td><strong>${r.name}</strong></td><td>${r.phone||'-'}</td>
+      <td><span class="badge badge-green">${r.governorate||'-'}</span></td>
+      <td>${r.product_type||'-'}</td><td>${r.quantity||1}</td>
+      <td><span class="price-badge">${(r.total_price||0).toLocaleString()} ج</span></td>
+      <td>
+        <div class="table-actions">
+          <button class="btn btn-secondary btn-sm" onclick='showInvoice(${JSON.stringify(r)})'>🧾</button>
+          <button class="btn btn-secondary btn-sm" onclick="openEditFromSearch(${r.id})">✏️</button>
+        </div>
+      </td>
+    </tr>`;
+  });
+  html+='</tbody></table></div>';
+  document.getElementById('search-results').innerHTML=html;
+  document.getElementById('search-export-bar').style.display='flex';
+  updateSelectedCount();
+}
+
+function onResultCheck(el) {
+  const id = parseInt(el.dataset.id);
+  const customer = searchResults.find(r => r.id === id);
+  if(el.checked && customer) selectedIds.set(id, customer);
+  else selectedIds.delete(id);
+  const row = el.closest('tr');
+  if(row) row.style.background = el.checked ? '#e8f5f0' : '';
+  updateSelectedCount();
+}
+
+function toggleAllChecks(el) {
+  document.querySelectorAll('.result-check').forEach(c=>{
+    c.checked = el.checked;
+    const id = parseInt(c.dataset.id);
+    const customer = searchResults.find(r => r.id === id);
+    if(el.checked && customer) selectedIds.set(id, customer);
+    else selectedIds.delete(id);
+    const row = c.closest('tr');
+    if(row) row.style.background = el.checked ? '#e8f5f0' : '';
+  });
+  updateSelectedCount();
+}
+
+function updateSelectedCount() {
+  const n = selectedIds.size;
+  const el = document.getElementById('selected-count');
+  if(el) el.textContent = n ? `✅ تم تحديد ${n} عميل من بحوث مختلفة` : '';
+  const clearBtn = document.getElementById('clear-selection-btn');
+  if(clearBtn){
+    clearBtn.style.display = n ? 'inline-flex' : 'none';
+    clearBtn.textContent = `✕ مسح التحديد (${n})`;
+  }
+}
+
+function clearSelection() {
+  selectedIds.clear();
+  document.querySelectorAll('.result-check').forEach(c=>{
+    c.checked=false;
+    const row=c.closest('tr');
+    if(row) row.style.background='';
+  });
+  updateSelectedCount();
+}
+
+function printSelectedPDF() {
+  if(!selectedIds.size){notify('⚠️ اختر عملاء أولاً');return;}
+  // نجمع كل العملاء المحددين من searchResults الحالية + أي نتائج سابقة محفوظة
+  const selected = allSelectedCustomers();
+  if(!selected.length){notify('⚠️ لم يتم العثور على بيانات المحددين');return;}
+  buildMultiPagePDF(selected);
+}
+
+function allSelectedCustomers() {
+  return [...selectedIds.values()];
+}
+
+// ==================== INVOICE SINGLE ====================
+function showInvoice(customer) {
+  currentInvoice=customer;
+  const date=new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'});
+  const html=`
+    <div class="invoice-preview" id="invoice-print">
+      <div class="invoice-header">
+        <h3>📦 فاتورة طلب</h3>
+        <p style="color:var(--text-muted);font-size:12px;margin-top:4px;">تاريخ: ${date}</p>
+      </div>
+      <div style="margin:1rem 0;">
+        <div class="invoice-row"><span>👤 الاسم</span><strong>${customer.name}</strong></div>
+        <div class="invoice-row"><span>📞 التليفون</span><span>${customer.phone||'-'}</span></div>
+        <div class="invoice-row"><span>📍 المحافظة</span><span>${customer.governorate||'-'}</span></div>
+        <div class="invoice-row"><span>🏠 العنوان</span><span style="text-align:right;max-width:60%;">${customer.address||'-'}</span></div>
+        <div class="invoice-row" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+          <span>📦 المنتج</span><span>${customer.product_type||'-'}</span></div>
+        <div class="invoice-row"><span>🎨 الطلب</span><span>${[customer.color, customer.size].filter(Boolean).join(' — ')||'-'}</span></div>
+        <div class="invoice-row"><span>🔢 الكمية</span><span>${customer.quantity||1} قطعة</span></div>
+        <div class="invoice-row" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
+          <span>💵 السعر</span><span>${(customer.price||0).toLocaleString()} جنيه</span></div>
+        <div class="invoice-row"><span>🚚 الشحن</span><span>${(customer.shipping||0).toLocaleString()} جنيه</span></div>
+      </div>
+      <div class="invoice-total">
+        <span>💰 الإجمالي</span><span>${(customer.total_price||0).toLocaleString()} جنيه</span>
+      </div>
+      ${customer.notes?`<p style="margin-top:8px;font-size:12px;color:var(--text-muted);">📝 ${customer.notes}</p>`:''}
+    </div>`;
+  document.getElementById('invoice-content').innerHTML=html;
+  document.getElementById('invoice-modal').classList.add('open');
+}
+function closeInvoice(){document.getElementById('invoice-modal').classList.remove('open');}
+
+// ==================== PDF GENERATION (ARABIC) ====================
+function getPdfFilename() {
+  const now = new Date();
+  const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  return `فواتير — ${now.getDate()} ${months[now.getMonth()]} — ${days[now.getDay()]}`;
+}
+
+function printSinglePDF() {
+  if(!currentInvoice) return;
+  if(currentInvoice.id) sbMarkPrinted([currentInvoice.id]).then(()=>{
+    if(allRecords.length) renderRecords(allRecords);
+  });
+  const date=new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'});
+  const html=buildPrintableHTML([currentInvoice], date, 'single', getPdfFilename());
+  const w=window.open('','_blank','width=700,height=900');
+  w.document.write(html);
+  w.document.close();
+  notify('✅ فتح نافذة الطباعة');
+}
+
+function buildMultiPagePDF(customers) {
+  if(!customers.length){notify('⚠️ لا يوجد عملاء محددون');return;}
+
+  // تسجيل المطبوعين في DB وفي الذاكرة
+  const ids = customers.filter(c=>c.id).map(c=>c.id);
+  if(ids.length) sbMarkPrinted(ids).then(()=>{
+    if(allRecords.length) renderRecords(allRecords);
+  });
+
+  const date=new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'});
+  const html=buildPrintableHTML(customers, date, 'multi', getPdfFilename());
+  const w=window.open('','_blank','width=1100,height=850');
+  w.document.write(html);
+  w.document.close();
+  notify(`✅ تم فتح ${customers.length} فاتورة (${Math.ceil(customers.length/3)} صفحة)`);
+}
+
+// ==================== UNIFIED PDF BUILDER (Arabic RTL) ====================
+function buildPrintableHTML(customers, date, mode, pdfTitle="فواتير") {
+  const isSingle = mode==='single';
+  let pages='';
+  if(isSingle){
+    pages=`<div class="page single-page">${buildInvoiceHTML(customers[0],1,date)}</div>`;
+  } else {
+    for(let i=0;i<customers.length;i+=3){
+      const group=customers.slice(i,i+3);
+      let cols='';
+      group.forEach((c,j)=>{
+        cols+=`<div class="inv-col">${buildInvoiceHTML(c,i+j+1,date)}</div>`;
+      });
+      for(let k=group.length;k<3;k++) cols+=`<div class="inv-col inv-col-empty"></div>`;
+      pages+=`<div class="page"><div class="inv-stack">${cols}</div></div>`;
+    }
+  }
+  return `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>${pdfTitle}</title>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:'Cairo',sans-serif;direction:rtl;text-align:right;background:#ccc;padding:8px;}
+  .no-print{text-align:center;margin-bottom:10px;}
+  .no-print button{background:#1a6b4a;color:white;border:none;padding:10px 32px;
+    border-radius:8px;font-family:'Cairo',sans-serif;font-size:14px;cursor:pointer;font-weight:700;}
+
+  /* صفحة A4 رأسية بارتفاع ثابت */
+  .page{
+    background:white;
+    width:210mm;
+    height:297mm;
+    margin:0 auto 10px;
+    padding:5mm 6mm;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+    page-break-after:always;
+  }
+  .page:last-child{page-break-after:auto;}
+  .single-page{height:auto;}
+
+  /* الثلاث فواتير تملأ الصفحة بالتساوي */
+  .inv-stack{
+    display:flex;
+    flex-direction:column;
+    gap:3mm;
+    height:100%;
+  }
+  .inv-col{
+    flex:1;
+    min-height:0;
+    display:flex;
+    flex-direction:column;
+  }
+  .inv-col-empty{visibility:hidden;}
+
+  /* صندوق الفاتورة */
+  .invoice-box{
+    border:1.5px solid #1a6b4a;
+    border-radius:6px;
+    overflow:hidden;
+    background:white;
+    display:flex;
+    flex-direction:column;
+    height:100%;
+    font-weight:700;
+  }
+
+  /* رأس الفاتورة - البراند + العنوان */
+  .inv-brand{
+    background:#0f4a33;
+    color:white;
+    text-align:center;
+    padding:4px 8px;
+    font-size:14px;
+    font-weight:800;
+    letter-spacing:1px;
+  }
+  .inv-head{background:#1a6b4a;color:white;text-align:center;padding:5px 8px;}
+  .inv-head .inv-title{font-size:15px;font-weight:800;}
+  .inv-head .inv-date{font-size:12px;opacity:0.9;margin-top:2px;font-weight:700;}
+
+  /* جسم الفاتورة */
+  .inv-body{flex:1;overflow:hidden;}
+  .inv-row-item{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:3px 6px;border-bottom:1px dashed #e0e8e4;
+    font-size:14px;line-height:1.5;font-weight:700;
+  }
+  .inv-row-item:nth-child(odd){background:#f5f7f6;}
+  .inv-lbl{color:#0f4a33;font-weight:800;white-space:nowrap;margin-left:6px;flex-shrink:0;min-width:85px;}
+  .inv-val{color:#1a2e24;font-weight:700;text-align:left;word-break:break-word;}
+  .inv-row-double{display:flex;padding:0!important;background:inherit;}
+  .inv-half{flex:1;display:flex;align-items:center;padding:3px 6px;gap:4px;}
+  .inv-divider{width:1px;background:#d8e5de;flex-shrink:0;}
+
+  /* إجمالي الفاتورة */
+  .inv-total{
+    background:#f0a500;color:#4a2800;
+    display:flex;justify-content:space-between;align-items:center;
+    padding:5px 10px;font-weight:800;font-size:14px;
+    flex-shrink:0;
+  }
+  .inv-notes{font-size:14px;color:#6b8a7a;padding:3px 8px;background:#fff8e6;flex-shrink:0;font-weight:700;}
+
+  /* طباعة */
+  @media print{
+    body{background:white;padding:0;}
+    .no-print{display:none!important;}
+    .page{margin:0;padding:4mm 5mm;border-radius:0;}
+    @page{margin:0;size:A4 portrait;}
+  }
+</style>
+</head>
+<body>
+<div class="no-print">
+  <button onclick="window.print()">🖨️ طباعة / حفظ PDF</button>
+</div>
+${pages}
+</body>
+</html>`;
+}
+
+function buildInvoiceHTML(customer, num, date) {
+  const orderVal = [customer.color, customer.size].filter(Boolean).join(' — ')||'-';
+  // QR يحتوي على ID العميل أو رقم الفاتورة
+  const qrData = customer.id ? `INVOICE:${customer.id}` : `INV:${num}:${customer.phone||''}`;
+  const qrId = `qr-${num}-${Date.now()}`;
+
+  const rowsHTML = `
+    <div class="inv-row-item inv-row-double">
+      <div class="inv-half"><span class="inv-lbl">👤 الاسم</span><span class="inv-val">${customer.name||'-'}</span></div>
+      <div class="inv-divider"></div>
+      <div class="inv-half"><span class="inv-lbl">📞 التليفون</span><span class="inv-val">${customer.phone||'-'}</span></div>
+    </div>
+    <div class="inv-row-item">
+      <span class="inv-lbl">📍 المحافظة</span>
+      <span class="inv-val">${customer.governorate||'-'}</span>
+    </div>
+    <div class="inv-row-item">
+      <span class="inv-lbl">🏠 العنوان</span>
+      <span class="inv-val">${customer.address||'-'}</span>
+    </div>
+    <div class="inv-row-item">
+      <span class="inv-lbl">📦 المنتج</span>
+      <span class="inv-val">${customer.product_type||'-'}</span>
+    </div>
+    <div class="inv-row-item">
+      <span class="inv-lbl">🎨 الطلب</span>
+      <span class="inv-val">${orderVal}</span>
+    </div>
+    <div class="inv-row-item">
+      <span class="inv-lbl">🔢 الكمية</span>
+      <span class="inv-val">${(customer.quantity||1)} قطعة</span>
+    </div>
+    <div class="inv-row-item inv-row-double" style="background:#fff3d6;">
+      <div class="inv-half"><span class="inv-lbl" style="color:#8a5000;">💵 السعر</span><span class="inv-val" style="color:#8a5000;">${(customer.price||0).toLocaleString()} ج</span></div>
+      <div class="inv-divider"></div>
+      <div class="inv-half"><span class="inv-lbl" style="color:#8a5000;">🚚 شحن</span><span class="inv-val" style="color:#8a5000;">${(customer.shipping||0).toLocaleString()} ج</span></div>
+      <div class="inv-divider"></div>
+      <div class="inv-half"><span class="inv-lbl" style="color:#5a3000;font-size:13px;">💰 إجمالي</span><span class="inv-val" style="color:#5a3000;font-weight:800;">${(customer.total_price||0).toLocaleString()} ج</span></div>
+    </div>`;
+
+  const notesHTML=customer.notes?`<div class="inv-notes">📝 ${customer.notes}</div>`:'';
+  return `
+  <div class="invoice-box">
+    <div class="inv-brand">✨ براء ✨</div>
+    <div class="inv-head" style="display:flex;justify-content:space-between;align-items:center;padding:5px 10px;">
+      <div class="inv-title">🧾 فاتورة رقم ${num}</div>
+      <div class="inv-date">${date}</div>
+    </div>
+    <div style="display:flex;align-items:flex-start;">
+      <div class="inv-body" style="flex:1;">${rowsHTML}</div>
+      <div style="padding:6px;flex-shrink:0;display:flex;flex-direction:column;align-items:center;justify-content:center;border-right:1px dashed #d8e5de;">
+        <img src="https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(qrData)}&color=0f4a33&bgcolor=ffffff&margin=2"
+           style="width:80px;height:80px;display:block;" alt="QR">
+        <div style="font-size:8px;color:#888;margin-top:2px;text-align:center;">مسح للبحث</div>
+      </div>
+    </div>
+    ${notesHTML}
+  </div>`;
+}
+
+// ==================== EXCEL EXPORT (محدد الأعمدة) ====================
+function buildExcelData(data) {
+  return data.map((r,i)=>({
+    '#': i+1,
+    'اسم العميل': r.name||'',
+    'رقم التليفون': r.phone||'',
+    'المحافظة': r.governorate||'',
+    'عدد القطع': r.quantity||1,
+    'نوع المنتج': r.product_type||'',
+    'إجمالي السعر': r.total_price||0
+  }));
+}
+
+function generateFilename(data) {
+  const now = new Date();
+  const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const dayName = days[now.getDay()];
+  const dateStr = now.getDate() + ' ' + months[now.getMonth()];
+
+  // الغالبية من المحافظات
+  const govCount = {};
+  data.forEach(c => {
+    const g = (c.governorate||'').trim();
+    if(g) govCount[g] = (govCount[g]||0) + 1;
+  });
+
+  const CAIRO_GOVS   = ['القاهرة','الجيزة','القليوبية','حلوان','٦ أكتوبر'];
+  const SAEED_GOVS   = ['أسيوط','قنا','أسوان','سوهاج','الأقصر','المنيا','بني سويف'];
+  const DELTA_GOVS   = ['الغربية','الدقهلية','الشرقية','المنوفية','البحيرة','كفر الشيخ','دمياط','الإسكندرية','بورسعيد','الإسماعيلية','السويس'];
+
+  const total = data.length || 1;
+  const cairoCount = data.filter(c => CAIRO_GOVS.some(g => (c.governorate||'').includes(g))).length;
+  const saeedCount = data.filter(c => SAEED_GOVS.some(g => (c.governorate||'').includes(g))).length;
+  const deltaCount = data.filter(c => DELTA_GOVS.some(g => (c.governorate||'').includes(g))).length;
+
+  let region = '';
+  if(cairoCount >= saeedCount && cairoCount >= deltaCount && cairoCount > total * 0.3)
+    region = 'القاهرة';
+  else if(saeedCount >= cairoCount && saeedCount >= deltaCount && saeedCount > total * 0.3)
+    region = 'الصعيد';
+  else if(deltaCount >= cairoCount && deltaCount >= saeedCount && deltaCount > total * 0.3)
+    region = 'محافظات';
+  else {
+    // الاسم الأكثر تكراراً
+    const topGov = Object.entries(govCount).sort((a,b)=>b[1]-a[1])[0];
+    region = topGov ? topGov[0] : 'عملاء';
+  }
+
+  return `${region} — ${dayName} ${dateStr}`;
+}
+
+function downloadExcel(data, filename) {
+  const now = new Date();
+  const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const dayName = days[now.getDay()];
+  const dateStr = now.toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'});
+
+  const wb = XLSX.utils.book_new();
+  const ws = {};
+
+  // ── الألوان ──
+  const COLOR_BRAND_BG   = '0D3D29'; // أخضر داكن جداً
+  const COLOR_BRAND_FG   = 'FFFFFF';
+  const COLOR_DATE_BG    = '1A6B4A'; // أخضر متوسط
+  const COLOR_DATE_FG    = 'FFFFFF';
+  const COLOR_HEADER_BG  = '2D8F65'; // أخضر فاتح
+  const COLOR_HEADER_FG  = 'FFFFFF';
+  const COLOR_ROW_ODD    = 'F0F7F4'; // أبيض مخضر فاتح جداً
+  const COLOR_ROW_EVEN   = 'FFFFFF';
+  const COLOR_TOTAL_BG   = 'FFF3D6'; // ذهبي فاتح
+  const COLOR_TOTAL_FG   = 'A05E00';
+  const COLOR_BORDER     = 'B8D0C4';
+
+  const cols = ['A','B','C','D','E','F','G'];
+  const headers = ['#','اسم العميل','رقم التليفون','المحافظة','عدد القطع','نوع المنتج','إجمالي السعر'];
+  const colWidths = [5, 24, 16, 16, 12, 24, 16];
+
+  // دالة مساعدة لبناء خلية
+  const cell = (v, opts={}) => {
+    const c = { v, t: typeof v==='number'?'n':'s' };
+    const base = {
+      font: { name:'Cairo', sz: opts.sz||11, bold:opts.bold||false, color:{rgb: opts.fg||'1A2E24'} },
+      fill: opts.bg ? { fgColor:{rgb:opts.bg}, patternType:'solid' } : undefined,
+      alignment: { horizontal: opts.align||'right', vertical:'center', wrapText:true, readingOrder:2 },
+      border: {
+        top:    {style:'thin', color:{rgb:COLOR_BORDER}},
+        bottom: {style:'thin', color:{rgb:COLOR_BORDER}},
+        left:   {style:'thin', color:{rgb:COLOR_BORDER}},
+        right:  {style:'thin', color:{rgb:COLOR_BORDER}},
+      }
+    };
+    if(opts.borderBottom) base.border.bottom = {style:'medium', color:{rgb:opts.borderBottom}};
+    if(opts.borderTop)    base.border.top    = {style:'medium', color:{rgb:opts.borderTop}};
+    c.s = base;
+    return c;
+  };
+
+  // ── صف البراند (R1) — مدموج ومتوسط ──
+  ws['A1'] = cell('✨  براء  ✨', {sz:16, bold:true, fg:COLOR_BRAND_FG, bg:COLOR_BRAND_BG, align:'center', borderBottom:'0D3D29'});
+  for(let i=1;i<7;i++) ws[cols[i]+'1'] = cell('', {bg:COLOR_BRAND_BG, borderBottom:'0D3D29'});
+
+  // ── صف التاريخ (R2) — مدموج ومتوسط ──
+  ws['A2'] = cell(`${dayName}  —  ${dateStr}  |  إجمالي العملاء: ${data.length}`, {sz:11, bold:false, fg:COLOR_DATE_FG, bg:COLOR_DATE_BG, align:'center'});
+  for(let i=1;i<7;i++) ws[cols[i]+'2'] = cell('', {bg:COLOR_DATE_BG});
+
+  // ── صف فاضي (R3) ──
+  for(let i=0;i<7;i++) ws[cols[i]+'3'] = cell('');
+
+  // ── رأس الجدول (R4) ──
+  headers.forEach((h,i)=>{
+    ws[cols[i]+'4'] = cell(h, {sz:12, bold:true, fg:COLOR_HEADER_FG, bg:COLOR_HEADER_BG, align:'center', borderBottom:'1A6B4A', borderTop:'1A6B4A'});
+  });
+
+  // ── صفوف البيانات ──
+  data.forEach((r,idx)=>{
+    const row = idx + 5;
+    const bg  = idx%2===0 ? COLOR_ROW_ODD : COLOR_ROW_EVEN;
+    const vals = [idx+1, r.name||'', r.phone||'', r.governorate||'', r.quantity||1, r.product_type||'', r.total_price||0];
+    vals.forEach((v,i)=>{
+      const isNum = (i===0||i===4||i===6);
+      ws[cols[i]+row] = cell(v, {bg, align: isNum?'center':'right'});
+    });
+  });
+
+  // ── إعدادات الورقة (بدون صف إجمالي) ──
+  const lastRow = data.length + 4;
+  ws['!ref'] = `A1:G${lastRow}`;
+  ws['!cols'] = colWidths.map(w=>({wch:w}));
+  ws['!rows'] = [{hpt:28},{hpt:20},{hpt:8},{hpt:22}];
+  ws['!merges'] = [
+    {s:{r:0,c:0}, e:{r:0,c:6}}, // دمج صف البراند كاملاً
+    {s:{r:1,c:0}, e:{r:1,c:6}}, // دمج صف التاريخ كاملاً
+    {s:{r:2,c:0}, e:{r:2,c:6}}, // دمج الصف الفاضي
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'براء — العملاء');
+  XLSX.writeFile(wb, filename+'.xlsx');
+  // حفظ تلقائي في الأرشيف
+  saveToArchive(data, filename).catch(()=>{});
+  notify('✅ تم تصدير ملف Excel وحفظه في الأرشيف');
+}
+
+async function exportAllExcel() {
+  try{
+    const data=await sbSelect();
+    if(!data.length){notify('⚠️ لا توجد بيانات');return;}
+    downloadExcel(data,'جميع-العملاء');
+  } catch(err){notify('❌ خطأ: '+err.message);}
+}
+
+function exportRecordsExcel() {
+  const checked=[...document.querySelectorAll('.rec-check:checked')].map(c=>parseInt(c.dataset.idx));
+  if(checked.length>0){
+    const selected=checked.map(i=>allRecords[i]).filter(Boolean);
+    downloadExcel(selected, generateFilename(selected));
+  } else {
+    if(!allRecords.length){notify('⚠️ لا توجد بيانات');return;}
+    downloadExcel(allRecords, generateFilename(allRecords));
+  }
+}
+
+function exportSelectedExcel() {
+  if(!selectedIds.size){notify('⚠️ اختر عملاء أولاً');return;}
+  const selected = [...selectedIds.values()];
+  downloadExcel(selected, generateFilename(selected));
+}
+
+// ==================== EDIT MODAL ====================
+let editMode = null; // 'extracted' | 'record'
+let editIndex = null; // index in extractedCustomers or allRecords
+let editRecordId = null; // supabase id for record mode
+
+function openEditExtracted(i) {
+  const c = extractedCustomers[i];
+  editMode='extracted'; editIndex=i;
+  fillEditModal(c);
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function openEditRecord(i) {
+  const c = allRecords[i];
+  editMode='record'; editIndex=i; editRecordId=c.id;
+  fillEditModal(c);
+  document.getElementById('edit-modal').classList.add('open');
+}
+
+function fillEditModal(c) {
+  document.getElementById('edit-name').value     = c.name||'';
+  document.getElementById('edit-phone').value    = c.phone||'';
+  document.getElementById('edit-gov').value      = c.governorate||'';
+  document.getElementById('edit-address').value  = c.address||'';
+  document.getElementById('edit-product').value  = c.product_type||'';
+  document.getElementById('edit-color').value    = c.color||'';
+  document.getElementById('edit-size').value     = c.size||'';
+  document.getElementById('edit-qty').value      = c.quantity||1;
+  document.getElementById('edit-price').value    = c.price||0;
+  document.getElementById('edit-shipping').value = c.shipping||0;
+  document.getElementById('edit-total').value    = c.total_price||0;
+  document.getElementById('edit-notes').value    = c.notes||'';
+
+  // عرض الرسالة الأصلية
+  const msgDisplay = document.getElementById('edit-original-msg-display');
+  const msgEmpty   = document.getElementById('edit-original-msg-empty');
+  if(c.original_message) {
+    msgDisplay.textContent = c.original_message;
+    msgDisplay.style.display = 'block';
+    msgEmpty.style.display = 'none';
+  } else {
+    msgDisplay.style.display = 'none';
+    msgEmpty.style.display = 'block';
+  }
+}
+
+function autoFillEditShipping() {
+  const gov = document.getElementById('edit-gov').value;
+  const shipping = getShipping(gov);
+  document.getElementById('edit-shipping').value = shipping;
+  const price = parseFloat(document.getElementById('edit-price').value)||0;
+  document.getElementById('edit-total').value = price + shipping;
+}
+
+function readEditModal() {
+  const gov = document.getElementById('edit-gov').value.trim()||null;
+  const price = parseFloat(document.getElementById('edit-price').value)||0;
+  const shipping = getShipping(gov);
+  return {
+    name:         document.getElementById('edit-name').value.trim(),
+    phone:        document.getElementById('edit-phone').value.trim(),
+    governorate:  gov,
+    address:      document.getElementById('edit-address').value.trim()||null,
+    product_type: document.getElementById('edit-product').value.trim()||null,
+    color:        document.getElementById('edit-color').value.trim()||null,
+    size:         document.getElementById('edit-size').value.trim()||null,
+    quantity:     parseInt(document.getElementById('edit-qty').value)||1,
+    price,
+    shipping,
+    total_price:  price + shipping,
+    notes:        document.getElementById('edit-notes').value.trim()||null,
+  };
+}
+
+async function saveEdit() {
+  const data = readEditModal();
+  if(!data.name||!data.phone){notify('⚠️ الاسم والتليفون مطلوبان');return;}
+  if(editMode==='extracted'){
+    extractedCustomers[editIndex]={...extractedCustomers[editIndex],...data};
+    closeEditModal();
+    renderExtracted();
+    notify('✅ تم تعديل بيانات العميل');
+  } else if(editMode==='record'){
+    try{
+      await sbUpdate(editRecordId, data);
+      closeEditModal();
+      notify('✅ تم حفظ التعديلات في قاعدة البيانات');
+      loadRecords();
+    } catch(err){notify('❌ خطأ: '+err.message);}
+  }
+}
+
+function closeEditModal() {
+  document.getElementById('edit-modal').classList.remove('open');
+  editMode=null; editIndex=null; editRecordId=null;
+}
+
+// ==================== UNPRINTED ====================
+let unprintedRecords = [];
+
+async function loadUnprinted() {
+  document.getElementById('unprinted-loading').style.display='flex';
+  document.getElementById('unprinted-list').innerHTML='';
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?printed=eq.false&order=created_at.desc`, {
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+    });
+    unprintedRecords = await r.json();
+    document.getElementById('unprinted-loading').style.display='none';
+    renderUnprinted(unprintedRecords);
+  } catch(err) {
+    document.getElementById('unprinted-loading').style.display='none';
+    document.getElementById('unprinted-list').innerHTML=`<div class="alert alert-error">❌ خطأ في التحميل</div>`;
+  }
+}
+
+function renderUnprinted(data) {
+  const countEl = document.getElementById('unprinted-count');
+  if(!data.length) {
+    countEl.textContent='';
+    document.getElementById('unprinted-list').innerHTML=`
+      <div class="empty-state">
+        <div class="empty-icon">✅</div>
+        <p>رائع! كل الفواتير تم طباعتها</p>
+      </div>`;
+    return;
+  }
+  countEl.textContent = `${data.length} فاتورة لم تُطبع بعد`;
+
+  let html=`<div class="table-wrapper"><table>
+    <thead><tr>
+      <th><input type="checkbox" class="row-check" onchange="toggleUnprintedAll(this)"></th>
+      <th>#</th><th>الاسم</th><th>التليفون</th><th>المحافظة</th>
+      <th>المنتج</th><th>الكمية</th><th>الإجمالي</th><th>التاريخ</th><th>إجراءات</th>
+    </tr></thead><tbody>`;
+
+  data.forEach((r,i)=>{
+    const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('ar-EG') : '-';
+    html+=`<tr style="background:#fff8f8;">
+      <td><input type="checkbox" class="row-check unprinted-check" data-idx="${i}"></td>
+      <td>${i+1}</td>
+      <td><strong>${r.name}</strong></td>
+      <td>${r.phone||'-'}</td>
+      <td><span class="badge badge-green">${r.governorate||'-'}</span></td>
+      <td>${r.product_type||'-'}</td>
+      <td>${r.quantity||1}</td>
+      <td><span class="price-badge">${(r.total_price||0).toLocaleString()} ج</span></td>
+      <td><small style="color:var(--text-muted);">${dateStr}</small></td>
+      <td>
+        <div class="table-actions">
+          <button class="btn btn-primary btn-sm" onclick="printOnePDF(${i})">🖨️ طباعة</button>
+          <button class="btn btn-secondary btn-sm" onclick="markOnePrinted(${r.id},${i})">✅ مطبوع</button>
+        </div>
+      </td>
+    </tr>`;
+  });
+
+  html+='</tbody></table></div>';
+  document.getElementById('unprinted-list').innerHTML=html;
+}
+
+function toggleUnprintedAll(el) {
+  document.querySelectorAll('.unprinted-check').forEach(c=>c.checked=el.checked);
+}
+
+function getUnprintedSelected() {
+  return [...document.querySelectorAll('.unprinted-check:checked')]
+    .map(c=>unprintedRecords[parseInt(c.dataset.idx)]).filter(Boolean);
+}
+
+async function printOnePDF(idx) {
+  const customer = unprintedRecords[idx];
+  buildMultiPagePDF([customer]);
+}
+
+async function printUnprintedSelected() {
+  const selected = getUnprintedSelected();
+  if(!selected.length){notify('⚠️ اختر فواتير أولاً');return;}
+  buildMultiPagePDF(selected);
+}
+
+async function markOnePrinted(id, idx) {
+  await sbMarkPrinted([id]);
+  unprintedRecords.splice(idx,1);
+  renderUnprinted(unprintedRecords);
+  notify('✅ تم تحديدها كمطبوعة');
+}
+
+async function markUnprintedSelected() {
+  const selected = getUnprintedSelected();
+  if(!selected.length){notify('⚠️ اختر فواتير أولاً');return;}
+  const ids = selected.map(r=>r.id);
+  await sbMarkPrinted(ids);
+  loadUnprinted();
+  notify(`✅ تم تحديد ${ids.length} فاتورة كمطبوعة`);
+}
+
+async function sbMarkPrinted(ids) {
+  for(const id of ids) {
+    await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+      method:'PATCH',
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},
+      body:JSON.stringify({printed:true})
+    });
+    printedIds.add(id);
+  }
+}
+
+// ==================== ARCHIVE (excel_exports) ====================
+const ARCHIVE_TABLE = 'excel_exports';
+
+async function saveToArchive(data, filename) {
+  const now = new Date();
+  const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+  const record = {
+    filename,
+    export_date: now.toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}),
+    day_name: days[now.getDay()],
+    records_count: data.length,
+    data: data
+  };
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}`, {
+    method:'POST',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=representation'},
+    body:JSON.stringify(record)
+  });
+  if(!r.ok) console.warn('تعذر حفظ الأرشيف:', await r.text());
+}
+
+async function loadArchive() {
+  document.getElementById('archive-loading').style.display='flex';
+  document.getElementById('archive-list').innerHTML='';
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?order=created_at.desc`, {
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+    });
+    const data = await r.json();
+    document.getElementById('archive-loading').style.display='none';
+    renderArchive(data);
+  } catch(err) {
+    document.getElementById('archive-loading').style.display='none';
+    document.getElementById('archive-list').innerHTML=`<div class="alert alert-error">❌ خطأ في تحميل الأرشيف</div>`;
+  }
+}
+
+function renderArchive(data) {
+  const countEl = document.getElementById('archive-count');
+  if(!data.length) {
+    countEl.textContent = '';
+    document.getElementById('archive-list').innerHTML=`
+      <div class="empty-state">
+        <div class="empty-icon">🗂️</div>
+        <p>لا يوجد شيتات محفوظة بعد — عند تصدير أي شيت Excel سيُحفظ هنا تلقائياً</p>
+      </div>`;
+    return;
+  }
+  countEl.textContent = `${data.length} شيت محفوظ`;
+
+  let html = `<div class="table-wrapper"><table>
+    <thead><tr>
+      <th>#</th>
+      <th>اسم الملف</th>
+      <th>اليوم</th>
+      <th>التاريخ</th>
+      <th>عدد العملاء</th>
+      <th>إجراءات</th>
+    </tr></thead><tbody>`;
+
+  data.forEach((row, i) => {
+    const createdAt = new Date(row.created_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
+    html += `<tr>
+      <td>${i+1}</td>
+      <td><strong>📊 ${row.filename}</strong></td>
+      <td><span class="badge badge-green">${row.day_name}</span></td>
+      <td>${row.export_date} <small style="color:var(--text-muted);">${createdAt}</small></td>
+      <td><span class="price-badge">${row.records_count} عميل</span></td>
+      <td>
+        <div class="table-actions">
+          <button class="btn btn-primary btn-sm" onclick="reDownloadExcel(${row.id})">⬇️ تحميل</button>
+          <button class="btn btn-danger btn-sm" onclick="deleteArchiveRow(${row.id})">🗑️</button>
+        </div>
+      </td>
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  document.getElementById('archive-list').innerHTML = html;
+}
+
+async function reDownloadExcel(id) {
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=eq.${id}`, {
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+    });
+    const rows = await r.json();
+    if(!rows.length) { notify('⚠️ لم يتم العثور على الشيت'); return; }
+    const row = rows[0];
+    downloadExcel(row.data, row.filename);
+  } catch(err) { notify('❌ خطأ: '+err.message); }
+}
+
+async function deleteArchiveRow(id) {
+  if(!confirm('هل تريد حذف هذا الشيت من الأرشيف؟')) return;
+  await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=eq.${id}`, {
+    method:'DELETE',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+  });
+  notify('✅ تم الحذف');
+  loadArchive();
+}
+
+async function clearArchive() {
+  if(!confirm('هل تريد حذف كل الأرشيف نهائياً؟')) return;
+  await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=gt.0`, {
+    method:'DELETE',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+  });
+  notify('✅ تم حذف كل الأرشيف');
+  loadArchive();
+}
+// ==================== PRODUCTS ====================
+const PRODUCTS_KEY = 'saved_products';
+
+function loadProducts() {
+  try { return JSON.parse(localStorage.getItem(PRODUCTS_KEY)||'[]'); } catch(e){ return []; }
+}
+function saveProductsList(products) {
+  localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
+}
+function renderProductDropdown() {
+  const sel = document.getElementById('global-product');
+  if(!sel) return;
+  const current = sel.value;
+  sel.innerHTML = '<option value="">-- اختر أو أضف منتجاً --</option>';
+  loadProducts().forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p; sel.appendChild(opt);
+  });
+  if(current) sel.value = current;
+}
+function addProduct() {
+  const input = document.getElementById('new-product-input');
+  const name = input.value.trim();
+  if(!name){ notify('⚠️ اكتب اسم المنتج أولاً'); return; }
+  const products = loadProducts();
+  if(products.includes(name)){ notify('⚠️ المنتج موجود بالفعل'); return; }
+  products.push(name);
+  saveProductsList(products);
+  renderProductDropdown();
+  document.getElementById('global-product').value = name;
+  input.value = '';
+  notify('✅ تم إضافة المنتج: '+name);
+}
+
+async function updateTopStats() {
+  try{const data=await sbSelect();updateTopStatsFrom(data);}catch(e){}
+}
+function updateTopStatsFrom(data) {
+  document.getElementById('stat-total').textContent=data.length;
+  const today=new Date().toISOString().slice(0,10);
+  document.getElementById('stat-today').textContent=data.filter(r=>r.created_at&&r.created_at.startsWith(today)).length;
+  const rev=data.reduce((s,r)=>s+(r.total_price||0),0);
+  document.getElementById('stat-revenue').textContent=rev.toLocaleString()+' ج';
+}
+
+// ==================== INIT ====================
+updateTopStats();
+renderProductDropdown();
+</script>
+</body>
+</html>
