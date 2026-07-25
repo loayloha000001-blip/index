@@ -799,6 +799,23 @@ async function sbUpdate(id, data) {
   return await r.json();
 }
 
+// ==================== PHONE EXTRACTOR (بدون AI) ====================
+function extractPhoneFromText(text) {
+  // تحويل الأرقام العربية للإنجليزية أولاً
+  const arabicToEnglish = t => t.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
+  const normalized = arabicToEnglish(text);
+
+  // يبحث عن رقم يبدأ بـ 010 أو 011 أو 012 أو 015 ومكون من 11 رقم
+  const pattern = /0(10|11|12|15)\d{8}/g;
+  const matches = normalized.match(pattern);
+  if(matches && matches.length > 0) return matches[0];
+  // لو فيه أرقام بدون صفر في الأول مثل 10xxxxxxxx
+  const pattern2 = /(10|11|12|15)\d{8}/g;
+  const matches2 = normalized.match(pattern2);
+  if(matches2 && matches2.length > 0) return '0' + matches2[0];
+  return '';
+}
+
 // ==================== AI EXTRACT ====================
 async function extractFromMessages() {
   const text = document.getElementById('msg-input').value.trim();
@@ -896,7 +913,20 @@ ${batchText}
       }
 
       const batchResults = Array.isArray(parsed) ? parsed : [parsed];
-      const fixed = batchResults.map(c => {
+      const fixed = batchResults.map((c, idx) => {
+        // استخراج التليفون بالكود لو الـ AI أخطأ أو أهمله
+        if(!c.phone || c.phone.length < 11) {
+          const msgs = finalBatches[b].split('---');
+          const msgText = msgs[idx] || finalBatches[b];
+          const extracted = extractPhoneFromText(msgText);
+          if(extracted) c.phone = extracted;
+        }
+        // تنظيف رقم التليفون من أي رموز
+        if(c.phone) {
+          // تحويل أرقام عربية محتملة
+          c.phone = c.phone.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString());
+          c.phone = c.phone.replace(/[^0-9]/g,'').slice(0,11);
+        }
         const govShipping = getShipping(c.governorate);
         const aiPrice    = c.price    || 0;
         const aiShipping = c.shipping || 0;
@@ -1647,7 +1677,8 @@ function showInvoice(customer) {
         <div class="invoice-row"><span>🏠 العنوان</span><span style="text-align:right;max-width:60%;">${customer.address||'-'}</span></div>
         <div class="invoice-row" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
           <span>📦 المنتج</span><span>${customer.product_type||'-'}</span></div>
-        <div class="invoice-row"><span>🎨 الطلب</span><span>${[customer.color, customer.size].filter(Boolean).join(' — ')||'-'}</span></div>
+        <div class="invoice-row"><span>🎨 اللون</span><span>${customer.color||'-'}</span></div>
+        <div class="invoice-row"><span>📐 المقاس</span><span>${customer.size||'-'}</span></div>
         <div class="invoice-row"><span>🔢 الكمية</span><span>${customer.quantity||1} قطعة</span></div>
         <div class="invoice-row" style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;">
           <span>💵 السعر</span><span>${(customer.price||0).toLocaleString()} جنيه</span></div>
