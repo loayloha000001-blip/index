@@ -728,7 +728,7 @@
 const SUPABASE_URL = 'https://zdyugflxzjeaguiyurid.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpkeXVnZmx4emplYWd1aXl1cmlkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAxMzYxNzEsImV4cCI6MjA5NTcxMjE3MX0.INuT9aqUSOInKv-inKbqcbgLb4miZ1vWJD1Fwx5ruZc';
 const AI_PROXY = 'https://zdyugflxzjeaguiyurid.supabase.co/functions/v1/ai-proxy';
-const AI_MODEL = 'google/gemini-2.5-flash-lite';
+const AI_MODEL = 'openai/gpt-6-luna';
 const TABLE = 'customers';
 
 let extractedCustomers = [];
@@ -799,22 +799,75 @@ async function sbUpdate(id, data) {
   return await r.json();
 }
 
-// ==================== PHONE EXTRACTOR (بدون AI) ====================
-function extractPhoneFromText(text) {
-  // تحويل الأرقام العربية للإنجليزية أولاً
-  const arabicToEnglish = t => t.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d));
-  const normalized = arabicToEnglish(text);
+// ==================== COLOR EXTRACTOR (بدون AI) ====================
+const COLOR_DICT = [
+  { name: 'أصفر',    variants: ['اصفر','أصفر','اصفرا','اصفارا','صفراء','الاصفر','الأصفر'] },
+  { name: 'موف',     variants: ['موف','مووف','mov','mauve'] },
+  { name: 'بنفسجي', variants: ['بنفسجي','بنفسجى','بنفسج','بنفسجيي','bnfsgy'] },
+  { name: 'أخضر',   variants: ['اخضر','أخضر','خضراء','الاخضر','الأخضر','اخضرا'] },
+  { name: 'زيتي',   variants: ['زيتي','زيتى','زيتون','زيتوني','زيتونى'] },
+  { name: 'أحمر',   variants: ['احمر','أحمر','حمراء','الاحمر','الأحمر','احمرا'] },
+  { name: 'بني',    variants: ['بني','بنى','بنيي','البني','البنى','بنيه'] },
+  { name: 'لبني',   variants: ['لبني','لبنى','لبنيي','لبنه','كريمي','كريمى','كريم'] },
+  { name: 'بيبي بلو', variants: ['بيبي بلو','بيبى بلو','بيبي بلوو','baby blue','بيبيبلو','بيبى بلوو','بيبي','بيبى'] },
+  { name: 'رمادي',  variants: ['رمادي','رمادى','رصاصي','رصاصى','رمادي','الرمادي','الرمادى'] },
+  { name: 'بينك',   variants: ['بينك','بنك','pink','وردي','وردى','ورديه','الوردي','الوردى'] },
+  { name: 'كشمير',  variants: ['كشمير','كشميري','كشميرى','كاشمير','cashmere'] },
+  { name: 'أبيض',   variants: ['ابيض','أبيض','بيضاء','الابيض','الأبيض','ابيضا','وايت','white'] },
+  { name: 'أسود',   variants: ['اسود','أسود','سوداء','الاسود','الأسود','اسودا','بلاك','black'] },
+  { name: 'بيج',    variants: ['بيج','بيج','beige','بيجي','بيجى'] },
+  { name: 'تركواز', variants: ['تركواز','تركوازي','تركوازى','فيروزي','فيروزى'] },
+  { name: 'مارون',  variants: ['مارون','ماروني','مارونى','كرزي','كرزى','خمري','خمرى'] },
+  { name: 'نيلي',   variants: ['نيلي','نيلى','ازرق','أزرق','ازرقا','الازرق','الأزرق','بلو','blue','نيله'] },
+  { name: 'برتقالي',variants: ['برتقالي','برتقالى','برتقال','البرتقالي'] },
+  { name: 'ذهبي',   variants: ['ذهبي','ذهبى','ذهب','دهبي','دهبى'] },
+  { name: 'فضي',    variants: ['فضي','فضى','فضه','فضة','سيلفر','silver'] },
+];
 
-  // يبحث عن رقم يبدأ بـ 010 أو 011 أو 012 أو 015 ومكون من 11 رقم
-  const pattern = /0(10|11|12|15)\d{8}/g;
-  const matches = normalized.match(pattern);
-  if(matches && matches.length > 0) return matches[0];
-  // لو فيه أرقام بدون صفر في الأول مثل 10xxxxxxxx
-  const pattern2 = /(10|11|12|15)\d{8}/g;
-  const matches2 = normalized.match(pattern2);
-  if(matches2 && matches2.length > 0) return '0' + matches2[0];
-  return '';
+// بناء Regex من القاموس
+function buildColorRegex() {
+  const allVariants = [];
+  COLOR_DICT.forEach(c => {
+    c.variants.forEach(v => allVariants.push(v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  });
+  // ترتيب من الأطول للأقصر لتجنب التطابق الجزئي
+  allVariants.sort((a,b) => b.length - a.length);
+  return new RegExp(allVariants.join('|'), 'gi');
 }
+
+function normalizeColor(word) {
+  const w = word.trim().toLowerCase();
+  for(const c of COLOR_DICT) {
+    if(c.variants.some(v => v.toLowerCase() === w)) return c.name;
+  }
+  return word.trim();
+}
+
+function extractColorsFromText(text) {
+  if(!text) return { colors: [], count: 0 };
+  const regex = buildColorRegex();
+  const matches = [];
+  let m;
+  while((m = regex.exec(text)) !== null) {
+    const normalized = normalizeColor(m[0]);
+    // تجنب التكرار
+    if(!matches.includes(normalized)) matches.push(normalized);
+  }
+  return { colors: matches, count: matches.length };
+}
+
+function calcQuantityFromColors(colorStr, explicitQty) {
+  if(!colorStr) return explicitQty || 1;
+
+  // استخراج الألوان من الكود
+  const { count } = extractColorsFromText(colorStr);
+  const colorCount = count > 0 ? count : 1;
+
+  // لو الـ AI رجع عدد منطقي استخدمه، لو لأ استخدم عدد الألوان
+  if(explicitQty && explicitQty > 1 && explicitQty >= colorCount) return explicitQty;
+  return colorCount;
+}
+
 
 // ==================== AI EXTRACT ====================
 async function extractFromMessages() {
@@ -828,7 +881,7 @@ async function extractFromMessages() {
   document.getElementById('save-all-bar').style.display='none';
 
   // تقسيم الرسائل بالتاريخ اللي في أول كل رسالة واتساب [DD/MM, HH:MM am/pm]
-  const BATCH_SIZE = 10;
+  const BATCH_SIZE = 5;
   const datePattern = /(?=\[\d{1,2}\/\d{1,2},\s*\d{1,2}:\d{2}\s*(am|pm|AM|PM)\])/i;
   let messages = text.split(datePattern).map(m=>m.trim()).filter(m=>m.length>5);
 
@@ -884,7 +937,7 @@ async function extractFromMessages() {
   * مثال: color="أصفر / أخضر" size="XL / L"
   * لو كل الألوان بنفس المقاس: size="XL" فقط بدون تكرار
 - product_type: نوع المنتج (عباية/شميز/بنطلون...) — لو مش مذكور اتركه فارغاً
-- quantity: عدد القطع — إذا ذُكر عدد صريح ("2" أو "اثنين" أو "شميزين") استخدمه. إذا لم يُذكر احسب عدد البنود في طلب العميل
+- quantity: 1 دائماً — لا تحسب الكمية، الكود سيحسبها
 - price: الرقم بجوار (سعر/ثمن) فقط — لو مش موجود = 0
 - shipping: الرقم بجوار (شحن/توصيل) فقط — لو مش موجود = 0
 - total_price: الرقم بجوار (إجمالي/المجموع) فقط — لو مش موجود = 0
@@ -918,14 +971,7 @@ ${batchText}
       }
 
       const batchResults = Array.isArray(parsed) ? parsed : [parsed];
-      const fixed = batchResults.map((c, idx) => {
-        // استخراج التليفون بالكود لو الـ AI أخطأ أو أهمله
-        if(!c.phone || c.phone.length < 11) {
-          const msgs = finalBatches[b].split('---');
-          const msgText = msgs[idx] || finalBatches[b];
-          const extracted = extractPhoneFromText(msgText);
-          if(extracted) c.phone = extracted;
-        }
+      const fixed = batchResults.map(c => {
         // تنظيف رقم التليفون من أي رموز
         if(c.phone) {
           // تحويل أرقام عربية محتملة
@@ -1896,10 +1942,7 @@ function buildInvoiceHTML(customer, num, date) {
       <span class="inv-lbl">📐 المقاس</span>
       <span class="inv-val">${customer.size||'-'}</span>
     </div>
-    <div class="inv-row-item">
-      <span class="inv-lbl">🔢 الكمية</span>
-      <span class="inv-val">${(customer.quantity||1)} قطعة</span>
-    </div>
+
     <div class="inv-row-item inv-row-double" style="background:#fff3d6;">
       <div class="inv-half"><span class="inv-lbl" style="color:#8a5000;">💵 السعر</span><span class="inv-val" style="color:#8a5000;">${(customer.price||0).toLocaleString()} ج</span></div>
       <div class="inv-divider"></div>
@@ -2002,9 +2045,9 @@ function downloadExcel(data, filename) {
   const COLOR_TOTAL_FG   = 'A05E00';
   const COLOR_BORDER     = 'B8D0C4';
 
-  const cols = ['A','B','C','D','E','F','G'];
-  const headers = ['#','اسم العميل','رقم التليفون','المحافظة','عدد القطع','نوع المنتج','إجمالي السعر'];
-  const colWidths = [5, 24, 16, 16, 12, 24, 16];
+  const cols = ['A','B','C','D','E','F'];
+  const headers = ['#','اسم العميل','رقم التليفون','المحافظة','نوع المنتج','إجمالي السعر'];
+  const colWidths = [5, 24, 16, 16, 24, 16];
 
   // دالة مساعدة لبناء خلية
   const cell = (v, opts={}) => {
@@ -2028,11 +2071,11 @@ function downloadExcel(data, filename) {
 
   // ── صف البراند (R1) — مدموج ومتوسط ──
   ws['A1'] = cell('✨  براء  ✨', {sz:16, bold:true, fg:COLOR_BRAND_FG, bg:COLOR_BRAND_BG, align:'center', borderBottom:'0D3D29'});
-  for(let i=1;i<7;i++) ws[cols[i]+'1'] = cell('', {bg:COLOR_BRAND_BG, borderBottom:'0D3D29'});
+  for(let i=1;i<6;i++) ws[cols[i]+'1'] = cell('', {bg:COLOR_BRAND_BG, borderBottom:'0D3D29'});
 
   // ── صف التاريخ (R2) — مدموج ومتوسط ──
   ws['A2'] = cell(`${dayName}  —  ${dateStr}  |  إجمالي العملاء: ${data.length}`, {sz:11, bold:false, fg:COLOR_DATE_FG, bg:COLOR_DATE_BG, align:'center'});
-  for(let i=1;i<7;i++) ws[cols[i]+'2'] = cell('', {bg:COLOR_DATE_BG});
+  for(let i=1;i<6;i++) ws[cols[i]+'2'] = cell('', {bg:COLOR_DATE_BG});
 
   // ── صف فاضي (R3) ──
   for(let i=0;i<7;i++) ws[cols[i]+'3'] = cell('');
@@ -2046,22 +2089,22 @@ function downloadExcel(data, filename) {
   data.forEach((r,idx)=>{
     const row = idx + 5;
     const bg  = idx%2===0 ? COLOR_ROW_ODD : COLOR_ROW_EVEN;
-    const vals = [idx+1, r.name||'', r.phone||'', r.governorate||'', r.quantity||1, r.product_type||'', r.total_price||0];
+    const vals = [idx+1, r.name||'', r.phone||'', r.governorate||'', r.product_type||'', r.total_price||0];
     vals.forEach((v,i)=>{
-      const isNum = (i===0||i===4||i===6);
+      const isNum = (i===0||i===5);
       ws[cols[i]+row] = cell(v, {bg, align: isNum?'center':'right'});
     });
   });
 
   // ── إعدادات الورقة (بدون صف إجمالي) ──
   const lastRow = data.length + 4;
-  ws['!ref'] = `A1:G${lastRow}`;
+  ws['!ref'] = `A1:F${lastRow}`;
   ws['!cols'] = colWidths.map(w=>({wch:w}));
   ws['!rows'] = [{hpt:28},{hpt:20},{hpt:8},{hpt:22}];
   ws['!merges'] = [
-    {s:{r:0,c:0}, e:{r:0,c:6}}, // دمج صف البراند كاملاً
-    {s:{r:1,c:0}, e:{r:1,c:6}}, // دمج صف التاريخ كاملاً
-    {s:{r:2,c:0}, e:{r:2,c:6}}, // دمج الصف الفاضي
+    {s:{r:0,c:0}, e:{r:0,c:5}}, // دمج صف البراند كاملاً
+    {s:{r:1,c:0}, e:{r:1,c:5}}, // دمج صف التاريخ كاملاً
+    {s:{r:2,c:0}, e:{r:2,c:5}}, // دمج الصف الفاضي
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'براء — العملاء');
@@ -2133,337 +2176,4 @@ function fillEditModal(c) {
   const msgDisplay = document.getElementById('edit-original-msg-display');
   const msgEmpty   = document.getElementById('edit-original-msg-empty');
   if(c.original_message) {
-    msgDisplay.textContent = c.original_message;
-    msgDisplay.style.display = 'block';
-    msgEmpty.style.display = 'none';
-  } else {
-    msgDisplay.style.display = 'none';
-    msgEmpty.style.display = 'block';
-  }
-}
-
-function autoFillEditShipping() {
-  const gov = document.getElementById('edit-gov').value;
-  const shipping = getShipping(gov);
-  document.getElementById('edit-shipping').value = shipping;
-  const price = parseFloat(document.getElementById('edit-price').value)||0;
-  document.getElementById('edit-total').value = price + shipping;
-}
-
-function readEditModal() {
-  const gov = document.getElementById('edit-gov').value.trim()||null;
-  const price = parseFloat(document.getElementById('edit-price').value)||0;
-  const shipping = getShipping(gov);
-  return {
-    name:         document.getElementById('edit-name').value.trim(),
-    phone:        document.getElementById('edit-phone').value.trim(),
-    governorate:  gov,
-    address:      document.getElementById('edit-address').value.trim()||null,
-    product_type: document.getElementById('edit-product').value.trim()||null,
-    color:        document.getElementById('edit-color').value.trim()||null,
-    size:         document.getElementById('edit-size').value.trim()||null,
-    quantity:     parseInt(document.getElementById('edit-qty').value)||1,
-    price,
-    shipping,
-    total_price:  price + shipping,
-    notes:        document.getElementById('edit-notes').value.trim()||null,
-  };
-}
-
-async function saveEdit() {
-  const data = readEditModal();
-  if(!data.name||!data.phone){notify('⚠️ الاسم والتليفون مطلوبان');return;}
-  if(editMode==='extracted'){
-    extractedCustomers[editIndex]={...extractedCustomers[editIndex],...data};
-    closeEditModal();
-    renderExtracted();
-    notify('✅ تم تعديل بيانات العميل');
-  } else if(editMode==='record'){
-    try{
-      await sbUpdate(editRecordId, data);
-      closeEditModal();
-      notify('✅ تم حفظ التعديلات في قاعدة البيانات');
-      loadRecords();
-    } catch(err){notify('❌ خطأ: '+err.message);}
-  }
-}
-
-function closeEditModal() {
-  document.getElementById('edit-modal').classList.remove('open');
-  editMode=null; editIndex=null; editRecordId=null;
-}
-
-// ==================== UNPRINTED ====================
-let unprintedRecords = [];
-
-async function loadUnprinted() {
-  document.getElementById('unprinted-loading').style.display='flex';
-  document.getElementById('unprinted-list').innerHTML='';
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?printed=eq.false&order=created_at.desc`, {
-      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
-    });
-    unprintedRecords = await r.json();
-    document.getElementById('unprinted-loading').style.display='none';
-    renderUnprinted(unprintedRecords);
-  } catch(err) {
-    document.getElementById('unprinted-loading').style.display='none';
-    document.getElementById('unprinted-list').innerHTML=`<div class="alert alert-error">❌ خطأ في التحميل</div>`;
-  }
-}
-
-function renderUnprinted(data) {
-  const countEl = document.getElementById('unprinted-count');
-  if(!data.length) {
-    countEl.textContent='';
-    document.getElementById('unprinted-list').innerHTML=`
-      <div class="empty-state">
-        <div class="empty-icon">✅</div>
-        <p>رائع! كل الفواتير تم طباعتها</p>
-      </div>`;
-    return;
-  }
-  countEl.textContent = `${data.length} فاتورة لم تُطبع بعد`;
-
-  let html=`<div class="table-wrapper"><table>
-    <thead><tr>
-      <th><input type="checkbox" class="row-check" onchange="toggleUnprintedAll(this)"></th>
-      <th>#</th><th>الاسم</th><th>التليفون</th><th>المحافظة</th>
-      <th>المنتج</th><th>الكمية</th><th>الإجمالي</th><th>التاريخ</th><th>إجراءات</th>
-    </tr></thead><tbody>`;
-
-  data.forEach((r,i)=>{
-    const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('ar-EG') : '-';
-    html+=`<tr style="background:#fff8f8;">
-      <td><input type="checkbox" class="row-check unprinted-check" data-idx="${i}"></td>
-      <td>${i+1}</td>
-      <td><strong>${r.name}</strong></td>
-      <td>${r.phone||'-'}</td>
-      <td><span class="badge badge-green">${r.governorate||'-'}</span></td>
-      <td>${r.product_type||'-'}</td>
-      <td>${r.quantity||1}</td>
-      <td><span class="price-badge">${(r.total_price||0).toLocaleString()} ج</span></td>
-      <td><small style="color:var(--text-muted);">${dateStr}</small></td>
-      <td>
-        <div class="table-actions">
-          <button class="btn btn-primary btn-sm" onclick="printOnePDF(${i})">🖨️ طباعة</button>
-          <button class="btn btn-secondary btn-sm" onclick="markOnePrinted(${r.id},${i})">✅ مطبوع</button>
-        </div>
-      </td>
-    </tr>`;
-  });
-
-  html+='</tbody></table></div>';
-  document.getElementById('unprinted-list').innerHTML=html;
-}
-
-function toggleUnprintedAll(el) {
-  document.querySelectorAll('.unprinted-check').forEach(c=>c.checked=el.checked);
-}
-
-function getUnprintedSelected() {
-  return [...document.querySelectorAll('.unprinted-check:checked')]
-    .map(c=>unprintedRecords[parseInt(c.dataset.idx)]).filter(Boolean);
-}
-
-async function printOnePDF(idx) {
-  const customer = unprintedRecords[idx];
-  buildMultiPagePDF([customer]);
-}
-
-async function printUnprintedSelected() {
-  const selected = getUnprintedSelected();
-  if(!selected.length){notify('⚠️ اختر فواتير أولاً');return;}
-  buildMultiPagePDF(selected);
-}
-
-async function markOnePrinted(id, idx) {
-  await sbMarkPrinted([id]);
-  unprintedRecords.splice(idx,1);
-  renderUnprinted(unprintedRecords);
-  notify('✅ تم تحديدها كمطبوعة');
-}
-
-async function markUnprintedSelected() {
-  const selected = getUnprintedSelected();
-  if(!selected.length){notify('⚠️ اختر فواتير أولاً');return;}
-  const ids = selected.map(r=>r.id);
-  await sbMarkPrinted(ids);
-  loadUnprinted();
-  notify(`✅ تم تحديد ${ids.length} فاتورة كمطبوعة`);
-}
-
-async function sbMarkPrinted(ids) {
-  for(const id of ids) {
-    await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
-      method:'PATCH',
-      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},
-      body:JSON.stringify({printed:true})
-    });
-    printedIds.add(id);
-  }
-}
-
-// ==================== ARCHIVE (excel_exports) ====================
-const ARCHIVE_TABLE = 'excel_exports';
-
-async function saveToArchive(data, filename) {
-  const now = new Date();
-  const days = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-  const record = {
-    filename,
-    export_date: now.toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'}),
-    day_name: days[now.getDay()],
-    records_count: data.length,
-    data: data
-  };
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}`, {
-    method:'POST',
-    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=representation'},
-    body:JSON.stringify(record)
-  });
-  if(!r.ok) console.warn('تعذر حفظ الأرشيف:', await r.text());
-}
-
-async function loadArchive() {
-  document.getElementById('archive-loading').style.display='flex';
-  document.getElementById('archive-list').innerHTML='';
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?order=created_at.desc`, {
-      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
-    });
-    const data = await r.json();
-    document.getElementById('archive-loading').style.display='none';
-    renderArchive(data);
-  } catch(err) {
-    document.getElementById('archive-loading').style.display='none';
-    document.getElementById('archive-list').innerHTML=`<div class="alert alert-error">❌ خطأ في تحميل الأرشيف</div>`;
-  }
-}
-
-function renderArchive(data) {
-  const countEl = document.getElementById('archive-count');
-  if(!data.length) {
-    countEl.textContent = '';
-    document.getElementById('archive-list').innerHTML=`
-      <div class="empty-state">
-        <div class="empty-icon">🗂️</div>
-        <p>لا يوجد شيتات محفوظة بعد — عند تصدير أي شيت Excel سيُحفظ هنا تلقائياً</p>
-      </div>`;
-    return;
-  }
-  countEl.textContent = `${data.length} شيت محفوظ`;
-
-  let html = `<div class="table-wrapper"><table>
-    <thead><tr>
-      <th>#</th>
-      <th>اسم الملف</th>
-      <th>اليوم</th>
-      <th>التاريخ</th>
-      <th>عدد العملاء</th>
-      <th>إجراءات</th>
-    </tr></thead><tbody>`;
-
-  data.forEach((row, i) => {
-    const createdAt = new Date(row.created_at).toLocaleTimeString('ar-EG',{hour:'2-digit',minute:'2-digit'});
-    html += `<tr>
-      <td>${i+1}</td>
-      <td><strong>📊 ${row.filename}</strong></td>
-      <td><span class="badge badge-green">${row.day_name}</span></td>
-      <td>${row.export_date} <small style="color:var(--text-muted);">${createdAt}</small></td>
-      <td><span class="price-badge">${row.records_count} عميل</span></td>
-      <td>
-        <div class="table-actions">
-          <button class="btn btn-primary btn-sm" onclick="reDownloadExcel(${row.id})">⬇️ تحميل</button>
-          <button class="btn btn-danger btn-sm" onclick="deleteArchiveRow(${row.id})">🗑️</button>
-        </div>
-      </td>
-    </tr>`;
-  });
-
-  html += '</tbody></table></div>';
-  document.getElementById('archive-list').innerHTML = html;
-}
-
-async function reDownloadExcel(id) {
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=eq.${id}`, {
-      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
-    });
-    const rows = await r.json();
-    if(!rows.length) { notify('⚠️ لم يتم العثور على الشيت'); return; }
-    const row = rows[0];
-    downloadExcel(row.data, row.filename);
-  } catch(err) { notify('❌ خطأ: '+err.message); }
-}
-
-async function deleteArchiveRow(id) {
-  if(!confirm('هل تريد حذف هذا الشيت من الأرشيف؟')) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=eq.${id}`, {
-    method:'DELETE',
-    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
-  });
-  notify('✅ تم الحذف');
-  loadArchive();
-}
-
-async function clearArchive() {
-  if(!confirm('هل تريد حذف كل الأرشيف نهائياً؟')) return;
-  await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=gt.0`, {
-    method:'DELETE',
-    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
-  });
-  notify('✅ تم حذف كل الأرشيف');
-  loadArchive();
-}
-// ==================== PRODUCTS ====================
-const PRODUCTS_KEY = 'saved_products';
-
-function loadProducts() {
-  try { return JSON.parse(localStorage.getItem(PRODUCTS_KEY)||'[]'); } catch(e){ return []; }
-}
-function saveProductsList(products) {
-  localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
-}
-function renderProductDropdown() {
-  const sel = document.getElementById('global-product');
-  if(!sel) return;
-  const current = sel.value;
-  sel.innerHTML = '<option value="">-- اختر أو أضف منتجاً --</option>';
-  loadProducts().forEach(p => {
-    const opt = document.createElement('option');
-    opt.value = p; opt.textContent = p; sel.appendChild(opt);
-  });
-  if(current) sel.value = current;
-}
-function addProduct() {
-  const input = document.getElementById('new-product-input');
-  const name = input.value.trim();
-  if(!name){ notify('⚠️ اكتب اسم المنتج أولاً'); return; }
-  const products = loadProducts();
-  if(products.includes(name)){ notify('⚠️ المنتج موجود بالفعل'); return; }
-  products.push(name);
-  saveProductsList(products);
-  renderProductDropdown();
-  document.getElementById('global-product').value = name;
-  input.value = '';
-  notify('✅ تم إضافة المنتج: '+name);
-}
-
-async function updateTopStats() {
-  try{const data=await sbSelect();updateTopStatsFrom(data);}catch(e){}
-}
-function updateTopStatsFrom(data) {
-  document.getElementById('stat-total').textContent=data.length;
-  const today=new Date().toISOString().slice(0,10);
-  document.getElementById('stat-today').textContent=data.filter(r=>r.created_at&&r.created_at.startsWith(today)).length;
-  const rev=data.reduce((s,r)=>s+(r.total_price||0),0);
-  document.getElementById('stat-revenue').textContent=rev.toLocaleString()+' ج';
-}
-
-// ==================== INIT ====================
-updateTopStats();
-renderProductDropdown();
-</script>
-</body>
-</html>
+    msgDispla
