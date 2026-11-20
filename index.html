@@ -422,12 +422,11 @@
 
 <div class="tabs">
   <button class="tab-btn active" onclick="switchTab('extract',this)">🤖 استخراج من رسائل</button>
-  <button class="tab-btn" onclick="switchTab('manual',this)">✏️ إدخال يدوي</button>
   <button class="tab-btn" onclick="switchTab('records',this)">📋 سجل العملاء</button>
   <button class="tab-btn" onclick="switchTab('search',this)">🔍 البحث والتصدير</button>
   <button class="tab-btn" onclick="switchTab('unprinted',this)">🔴 غير مطبوعة</button>
   <button class="tab-btn" onclick="switchTab('archive',this)">🗂️ أرشيف الشيتات</button>
-  <button class="tab-btn" onclick="switchTab('exported',this)">📤 المُصدَّرون</button>
+  <button class="tab-btn" onclick="switchTab('exported',this)">👥 المُصدَّرون</button>
 </div>
 
 <div class="main">
@@ -450,6 +449,18 @@
           <input type="file" id="pq-file" accept=".json,application/json" style="display:none;" onchange="importPriceQty(this)">
         </div>
         <div id="pq-list" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+
+        <div style="margin-top:22px;padding-top:16px;border-top:1px solid var(--border);">
+          <h3 style="font-family:'Tajawal',sans-serif;font-size:14.5px;font-weight:700;margin-bottom:6px;">استثناءات حسب المنتج</h3>
+          <p style="font-size:12.5px;color:var(--text-muted);margin-bottom:12px;line-height:1.8;">لو منتج معين عدد قطعه مختلف عن الجدول العام، سجّله هنا. سيب السعر فاضي لو المنتج ده دايماً نفس العدد مهما كان السعر. لو كتبت سعر، الاستثناء بيشتغل على السعر ده بس. الاستثناء بيتقدّم على الجدول العام.</p>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:14px;">
+            <div class="form-group" style="width:190px;"><label>المنتج</label><input class="form-control" id="pr-product" list="pr-products-list" placeholder="اسم المنتج"><datalist id="pr-products-list"></datalist></div>
+            <div class="form-group" style="width:110px;"><label>عدد القطع</label><input class="form-control" type="number" id="pr-qty" placeholder="2" min="1" onkeydown="if(event.key==='Enter')addProductRule()"></div>
+            <div class="form-group" style="width:130px;"><label>السعر (اختياري)</label><input class="form-control" type="number" id="pr-price" placeholder="كل الأسعار" min="1" onkeydown="if(event.key==='Enter')addProductRule()"></div>
+            <button class="btn btn-primary btn-sm" style="height:40px;" onclick="addProductRule()">+ إضافة استثناء</button>
+          </div>
+          <div id="pr-list" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+        </div>
       </div>
     </div>
     <div class="card">
@@ -492,34 +503,6 @@
         <div id="save-all-bar" style="display:none;margin-top:1.5rem;padding-top:1rem;border-top:1px solid var(--border);align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;">
           <span style="font-size:14px;color:var(--text-muted);" id="save-count"></span>
           <button class="btn btn-primary" onclick="saveAllExtracted()">💾 حفظ جميع العملاء في قاعدة البيانات</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MANUAL PANEL -->
-  <div id="panel-manual" class="panel">
-    <div class="card">
-      <div class="card-header"><h2><span class="section-icon">✏️</span> إدخال بيانات عميل يدوياً</h2></div>
-      <div class="card-body">
-        <div id="manual-alert"></div>
-        <div class="form-grid">
-          <div class="form-group"><label>اسم العميل *</label><input class="form-control" id="m-name" placeholder="الاسم الكامل"></div>
-          <div class="form-group"><label>رقم التليفون *</label><input class="form-control" id="m-phone" placeholder="01xxxxxxxxx"></div>
-          <div class="form-group"><label>المحافظة</label><input class="form-control" id="m-gov" placeholder="مثال: الغربية" oninput="autoFillShipping()"></div>
-          <div class="form-group"><label>نوع المنتج</label><input class="form-control" id="m-product" placeholder="مثال: دريس نصين"></div>
-          <div class="form-group"><label>اللون</label><input class="form-control" id="m-color" placeholder="مثال: أصفر، كشمير"></div>
-          <div class="form-group"><label>المقاس</label><input class="form-control" id="m-size" placeholder="مثال: 2XL"></div>
-          <div class="form-group"><label>عدد القطع</label><input class="form-control" type="number" id="m-qty" placeholder="1" min="1"></div>
-          <div class="form-group"><label>السعر (جنيه)</label><input class="form-control" type="number" id="m-price" placeholder="0" oninput="autoFillManualQty()"></div>
-          <div class="form-group"><label>الشحن (جنيه)</label><input class="form-control" type="number" id="m-shipping" placeholder="0"></div>
-          <div class="form-group"><label>الإجمالي (جنيه)</label><input class="form-control" type="number" id="m-total" placeholder="0"></div>
-          <div class="form-group form-control-full"><label>العنوان التفصيلي</label><input class="form-control" id="m-address" placeholder="العنوان كاملاً"></div>
-          <div class="form-group form-control-full"><label>ملاحظات</label><input class="form-control" id="m-notes" placeholder="أي ملاحظات إضافية"></div>
-        </div>
-        <div style="margin-top:1.5rem;display:flex;gap:10px;">
-          <button class="btn btn-primary" onclick="saveManual()">💾 حفظ العميل</button>
-          <button class="btn btn-secondary" onclick="clearManual()">🗑️ مسح</button>
         </div>
       </div>
     </div>
@@ -611,26 +594,16 @@
     </div>
   </div>
 
-  <!-- EXPORTED PANEL -->
+  <!-- EXPORTED CUSTOMERS PANEL -->
   <div id="panel-exported" class="panel">
     <div class="card">
       <div class="card-header">
-        <h2><span class="section-icon">📤</span> العملاء المُصدَّرون في شيتات</h2>
+        <h2><span class="section-icon">👥</span> العملاء المُصدَّرون إلى شيتات</h2>
         <span id="exported-count" style="font-size:13px;color:var(--text-muted);font-weight:600;"></span>
       </div>
       <div class="card-body">
-        <div class="search-bar" style="margin-bottom:1rem;">
-          <div class="search-input-wrap" style="position:relative;">
-            <input type="text" id="exported-search-name" placeholder="ابحث بالاسم..." oninput="filterExported()" style="padding-left:28px;">
-            <span class="search-icon">🔍</span>
-            <button onclick="document.getElementById('exported-search-name').value='';filterExported();" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#e03d3d;font-size:15px;font-weight:700;line-height:1;padding:0;opacity:0.7;" title="مسح">✕</button>
-          </div>
-          <div class="search-input-wrap" style="position:relative;">
-            <input type="text" inputmode="numeric" id="exported-search-phone" placeholder="ابحث برقم التليفون..." oninput="filterExported()" style="padding-left:28px;">
-            <span class="search-icon">📞</span>
-            <button onclick="document.getElementById('exported-search-phone').value='';filterExported();" style="position:absolute;left:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:#e03d3d;font-size:15px;font-weight:700;line-height:1;padding:0;opacity:0.7;" title="مسح">✕</button>
-          </div>
-          <button class="btn btn-secondary btn-sm" onclick="loadExported()">🔄 تحديث</button>
+        <div class="form-group" style="margin-bottom:14px;">
+          <input class="form-control" id="exported-search" placeholder="🔍 ابحث بالاسم أو رقم التليفون..." oninput="renderExported()">
         </div>
         <div id="exported-loading" class="loading" style="display:none;"><div class="spinner"></div> جاري التحميل...</div>
         <div id="exported-list"></div>
@@ -748,7 +721,7 @@
       <div class="form-group"><label>📞 رقم التليفون *</label><input class="form-control" id="edit-phone"></div>
       <div class="form-group"><label>📍 المحافظة</label><input class="form-control" id="edit-gov" oninput="autoFillEditShipping()"></div>
       <div class="form-group"><label>🏠 العنوان</label><input class="form-control" id="edit-address"></div>
-      <div class="form-group"><label>📦 نوع المنتج</label><input class="form-control" id="edit-product"></div>
+      <div class="form-group"><label>📦 نوع المنتج</label><input class="form-control" id="edit-product" oninput="autoFillEditQty()"></div>
       <div class="form-group"><label>🎨 اللون</label><input class="form-control" id="edit-color"></div>
       <div class="form-group"><label>📐 المقاس</label><input class="form-control" id="edit-size"></div>
       <div class="form-group"><label>🔢 عدد القطع</label><input class="form-control" type="number" id="edit-qty" min="1"></div>
@@ -808,8 +781,8 @@ function switchTab(tab, btn) {
   if(tab==='records') loadRecords();
   if(tab==='search') document.getElementById('search-results').innerHTML='';
   if(tab==='archive') loadArchive();
-  if(tab==='unprinted') loadUnprinted();
   if(tab==='exported') loadExported();
+  if(tab==='unprinted') loadUnprinted();
 }
 
 // ==================== SUPABASE ====================
@@ -821,6 +794,18 @@ async function sbInsert(data) {
   });
   if(!r.ok){const e=await r.text();throw new Error(e);}
   return await r.json();
+}
+// حفظ مجموعة عملاء في طلب واحد (بدل طلب لكل عميل)
+async function sbInsertMany(rows) {
+  const CHUNK = 50;
+  for(let i=0;i<rows.length;i+=CHUNK) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}`, {
+      method:'POST',
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify(rows.slice(i,i+CHUNK))
+    });
+    if(!r.ok){ const e=await r.text(); throw new Error(e); }
+  }
 }
 async function sbSelect(filter='') {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?order=created_at.desc${filter}`, {
@@ -844,6 +829,21 @@ async function sbUpdate(id, data) {
   });
   if(!r.ok) throw new Error(await r.text());
   return await r.json();
+}
+
+// ==================== PHONES (أكتر من رقم) ====================
+function toEnDigits(t) { return String(t||'').replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString()); }
+function phonesOf(str) { return String(str||'').split(/\s+-\s+/).map(x=>x.trim()).filter(Boolean); }
+// ينضّف الأرقام اللي رجعت من الـ AI، ويكمّل أي رقم موبايل ناقص من نص الرسالة الأصلية
+function cleanPhones(aiPhone, originalMsg) {
+  const raw = toEnDigits(aiPhone);
+  let nums = raw.split(/\s+-\s+|\s*[\/،,|\n]\s*/)
+    .map(x=>x.replace(/\D/g,'')).filter(x=>x.length>=8)
+    .flatMap(d => d.length>=20 ? d.match(/.{1,11}/g) : [d.slice(0,11)]);
+  if(!nums.length) { const d = raw.replace(/\D/g,'').slice(0,11); if(d) nums=[d]; }
+  const fromMsg = toEnDigits(originalMsg).match(/01[0125]\d{8}/g) || [];
+  fromMsg.forEach(n => { if(!nums.includes(n)) nums.push(n); });
+  return [...new Set(nums)].slice(0,3).join(' - ');
 }
 
 // ==================== COLOR EXTRACTOR (بدون AI) ====================
@@ -917,6 +917,28 @@ function calcQuantityFromColors(colorStr, explicitQty) {
 
 
 // ==================== AI EXTRACT ====================
+// ---- أدوات الاستخراج ----
+function parseAiJson(content) {
+  content = String(content||'').replace(/```json/gi,'').replace(/```/g,'').trim();
+  try { const p = JSON.parse(content); return Array.isArray(p) ? p : [p]; } catch(e) {}
+  // الرد اتقطع أو فيه نص زيادة: ننقذ كل العملاء الكاملين اللي اتكتبوا
+  const out = []; let depth = 0, start = -1, inStr = false, esc = false;
+  for(let i=0;i<content.length;i++){
+    const ch = content[i];
+    if(inStr){ if(esc) esc=false; else if(ch==='\\') esc=true; else if(ch==='"') inStr=false; continue; }
+    if(ch==='"'){ inStr=true; continue; }
+    if(ch==='{'){ if(depth===0) start=i; depth++; }
+    else if(ch==='}'){ depth--; if(depth===0 && start>=0){ try{ out.push(JSON.parse(content.slice(start,i+1))); }catch(e){} start=-1; } }
+  }
+  return out;
+}
+async function runPool(tasks, limit) {
+  let next = 0;
+  await Promise.all(Array.from({length:Math.min(limit,tasks.length)}, async () => {
+    while(next < tasks.length){ const mine = next++; await tasks[mine](); }
+  }));
+}
+
 async function extractFromMessages() {
   const text = document.getElementById('msg-input').value.trim();
   if(!text){notify('⚠️ الرجاء لصق رسائل العملاء أولاً');return;}
@@ -928,7 +950,8 @@ async function extractFromMessages() {
   document.getElementById('save-all-bar').style.display='none';
 
   // تقسيم الرسائل بالتاريخ اللي في أول كل رسالة واتساب [DD/MM, HH:MM am/pm]
-  const BATCH_SIZE = 5;
+  const BATCH_SIZE = 3;      // رسائل في الطلب الواحد (قلّلناها عشان الرد ما يتقطعش)
+  const CONCURRENCY = 3;     // طلبات متوازية
   const datePattern = /(?=\[\d{1,2}\/\d{1,2},\s*\d{1,2}:\d{2}\s*(am|pm|AM|PM)\])/i;
   let messages = text.split(datePattern).map(m=>m.trim()).filter(m=>m.length>5);
 
@@ -937,43 +960,51 @@ async function extractFromMessages() {
     m.replace(/^\[\d{1,2}\/\d{1,2},\s*\d{1,2}:\d{2}\s*(am|pm|AM|PM)\]\s*[^:]+:\s*/i,'').trim()
   ).filter(m=>m.length>5);
 
-  // لو ما لاقاش تاريخ — جرب السطر الفاضي
+  // لو ما لاقاش تاريخ — جرب الفواصل (--- أو ===) أو السطر الفاضي
   if(messages.length <= 1)
-    messages = text.split(/\n{2,}/).map(m=>m.trim()).filter(m=>m.length>5);
+    messages = text.split(/\n\s*[-=_*]{3,}\s*\n|\n\s*\n/).map(m=>m.trim()).filter(m=>m.length>5);
 
-  // لو لسه ما انقسمش — ابعت الكل في طلب واحد
-  if(messages.length <= 1) messages = [text];
+  // لو لسه ما انقسمش وطويل — قسّمه لقطع حوالي 1800 حرف عند نهاية سطر
+  let needOriginal = false;
+  if(messages.length <= 1) {
+    const lines = text.split('\n'); const chunks = []; let cur = '';
+    lines.forEach(l => { if(cur.length > 1800) { chunks.push(cur.trim()); cur = ''; } cur += l + '\n'; });
+    if(cur.trim()) chunks.push(cur.trim());
+    messages = chunks.length ? chunks : [text];
+    needOriginal = true; // القطعة ممكن فيها أكتر من عميل: الـ AI هو اللي يفصل نص كل رسالة
+  }
 
+  const batchSize = needOriginal ? 1 : BATCH_SIZE;
   const batches = [];
-  for(let i=0;i<messages.length;i+=BATCH_SIZE)
-    batches.push(messages.slice(i,i+BATCH_SIZE).join('\n---\n'));
+  for(let i=0;i<messages.length;i+=batchSize)
+    batches.push(Array.from({length:Math.min(batchSize,messages.length-i)},(_,k)=>i+k));
   const totalBatches = batches.length;
+  let doneBatches = 0, lastError = '';
 
   document.getElementById('extract-loading').innerHTML=`
     <div class="spinner"></div>
     <div style="flex:1;">
       <div id="progress-text" style="font-size:13px;font-weight:600;color:var(--primary);margin-bottom:6px;">
-        جاري معالجة الدفعة 1 من ${totalBatches}...
+        جاري معالجة ${messages.length} رسالة...
       </div>
       <div style="background:var(--border);border-radius:20px;height:8px;overflow:hidden;">
         <div id="progress-bar" style="background:linear-gradient(90deg,var(--primary),var(--primary-mid));height:100%;width:0%;transition:width 0.4s;border-radius:20px;"></div>
       </div>
     </div>`;
+  const updateProgress = () => {
+    document.getElementById('progress-text').textContent = `تمت معالجة ${doneBatches} من ${totalBatches} دفعة...`;
+    document.getElementById('progress-bar').style.width = Math.round((doneBatches/totalBatches)*100)+'%';
+  };
 
-  let allExtracted = [];
-
-  try {
-    for(let b=0;b<batches.length;b++){
-      document.getElementById('progress-text').textContent = `جاري معالجة الدفعة ${b+1} من ${totalBatches}...`;
-      document.getElementById('progress-bar').style.width = Math.round((b/totalBatches)*100)+'%';
-
-      const batchText = batches[b];
-      const prompt=`أنت مساعد متخصص في استخراج بيانات طلبات العملاء من الرسائل العربية غير المنتظمة.
+  // يبعت مجموعة رسائل للـ AI ويرجع العملاء الخام (أو يرمي خطأ)
+  const callAI = async (idxs) => {
+    const batchText = idxs.map(i => `[رسالة ${i+1}]\n${messages[i]}`).join('\n---\n');
+    const prompt=`أنت مساعد متخصص في استخراج بيانات طلبات العملاء من الرسائل العربية غير المنتظمة.
 استخرج بيانات العملاء وأرجع JSON array فقط بدون أي نص إضافي أو backticks.
 
 الحقول المطلوبة:
 - name: اسم العميل فقط
-- phone: رقم التليفون الأول فقط بدون أي رموز
+- phone: كل أرقام التليفون الموجودة في الرسالة (لو فيه رقمين أو ثلاثة اكتبهم كلهم ولا تهمل أي رقم) مفصولة بـ " - " وبدون أي رموز أخرى، مثال: 01012345678 - 01123456789
 - address: العنوان التفصيلي الكامل (شارع/حي/مدينة) بدون اسم المحافظة
 - governorate: المحافظة فقط — إذا لم تُذكر استنتجها من العنوان: "ميت غمر/المنصورة/طلخا" = الدقهلية، "طنطا/المحلة/كفر الزيات" = الغربية، "الزقازيق/العاشر/بلبيس" = الشرقية، "بنها/شبرا الخيمة/قليوب" = القليوبية، "إمبابة/الجيزة/العجوزة/الدقي/المهندسين/6 أكتوبر" = الجيزة، "مدينة نصر/مصر الجديدة/حلوان/المعادي/شبرا/عين شمس" = القاهرة، "الإسكندرية/الإسكندرية" = الإسكندرية، "أسيوط" = أسيوط، "سوهاج" = سوهاج، "قنا" = قنا، "الأقصر" = الأقصر، "أسوان" = أسوان، "المنيا" = المنيا، "دمياط" = دمياط، "كفر الشيخ" = كفر الشيخ، "البحيرة/دمنهور" = البحيرة، "المنوفية/شبين الكوم" = المنوفية، "بني سويف" = بني سويف، "الفيوم" = الفيوم.
 - color: انسخ نص طلب العميل حرفياً كما هو بدون أي تعديل أو حذف أو فصل. مثال: لو كتب "كشمير وبيبي بلو XXL" اكتب "كشمير وبيبي بلو XXL" بالضبط. لو كتب "أخضر 2XL وأصفر XL" اكتب "أخضر 2XL وأصفر XL" بالضبط. المقاس جزء من الطلب لا تحذفه أبداً.
@@ -989,83 +1020,118 @@ async function extractFromMessages() {
 - shipping: الرقم بجوار (شحن/توصيل) فقط — لو مش موجود = 0
 - total_price: الرقم بجوار (إجمالي/المجموع) فقط — لو مش موجود = 0
 - notes: أي ملاحظات أخرى لا تنتمي للحقول السابقة
-- original_message: انسخ نص الرسالة كاملاً كما هو بالضبط بدون أي تعديل
+${needOriginal ? '- original_message: انسخ نص الرسالة كاملاً كما هو بالضبط بدون أي تعديل\n' : ''}- msg_index: رقم الرسالة (الرقم اللي بين [رسالة N]) اللي أخذت منها بيانات العميل
+
+كل رسالة فيها عميل واحد على الأقل. لا تتجاهل أي رسالة أبداً حتى لو بياناتها ناقصة، وارجع عنصر لكل عميل بدون استثناء.
 
 الرسائل:
 ${batchText}
 
 أرجع JSON array فقط:
-[{"name":"اسم العميل","phone":"رقم التليفون","address":"العنوان","governorate":"المحافظة","product_type":"نوع المنتج","color":"طلب العميل كاملاً كما كتبه مثال: كشمير وبيبي بلو XXL","size":"","quantity":1,"price":0,"shipping":0,"total_price":0,"notes":""}]
+[{"msg_index":1,"name":"اسم العميل","phone":"رقم التليفون","address":"العنوان","governorate":"المحافظة","product_type":"نوع المنتج","color":"طلب العميل كاملاً كما كتبه مثال: كشمير وبيبي بلو XXL","size":"","quantity":1,"price":0,"shipping":0,"total_price":0,"notes":""}]
 
 مهم جداً: حقل color يجب أن يحتوي على نص الطلب كاملاً كما كتبه العميل بما فيه المقاس، ولا تضع أي شيء في size.`;
+    const response = await fetch(AI_PROXY,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:AI_MODEL,messages:[{role:'user',content:prompt}]})
+    });
+    if(!response.ok) throw new Error('فشل الاتصال بالـ AI: '+response.status);
+    const data = await response.json();
+    return parseAiJson(data.choices[0].message.content);
+  };
 
-      const response = await fetch(AI_PROXY,{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({model:AI_MODEL,messages:[{role:'user',content:prompt}]})
-      });
-      if(!response.ok) throw new Error('فشل الاتصال بـ OpenRouter: '+response.status);
-      const data = await response.json();
-      let content = data.choices[0].message.content.trim();
-      content = content.replace(/```json/gi,'').replace(/```/g,'').trim();
+  // يحدد كل عميل طلع من أنهي رسالة
+  const indexOf = (c, idxs) => {
+    const n = parseInt(c.msg_index) - 1;
+    if(idxs.includes(n)) return n;
+    const ph = phonesOf(cleanPhones(c.phone||'', ''))[0];
+    if(ph){ const hit = idxs.find(i => toEnDigits(messages[i]).replace(/\D/g,'').includes(ph)); if(hit !== undefined) return hit; }
+    return idxs.length === 1 ? idxs[0] : null;
+  };
 
-      let parsed;
-      try { parsed = JSON.parse(content); }
-      catch(e) {
-        const m = content.match(/\[[\s\S]*\]/);
-        if(m) try { parsed = JSON.parse(m[0]); } catch(e2) {}
-        if(!parsed){ console.warn(`دفعة ${b+1} فشلت`); continue; }
-      }
+  const perMsg = new Map();   // رقم الرسالة ← عملاءها
+  const loose = [];           // عملاء مقدرناش نحدد رسالتهم
+  const collect = (raw, idxs) => {
+    raw.forEach(c => {
+      const i = indexOf(c, idxs);
+      if(i === null) { loose.push(c); return; }
+      if(!perMsg.has(i)) perMsg.set(i, []);
+      perMsg.get(i).push(c);
+    });
+  };
 
-      const batchResults = Array.isArray(parsed) ? parsed : [parsed];
-      const fixed = batchResults.map(c => {
-        // تنظيف رقم التليفون من أي رموز
-        if(c.phone) {
-          // تحويل أرقام عربية محتملة
-          c.phone = c.phone.replace(/[٠١٢٣٤٥٦٧٨٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d).toString());
-          c.phone = c.phone.replace(/[^0-9]/g,'').slice(0,11);
-        }
-        const govShipping = getShipping(c.governorate);
-        const aiPrice    = c.price    || 0;
-        const aiShipping = c.shipping || 0;
-        const aiTotal    = c.total_price || 0;
-        let price, shipping, total;
-        if(aiShipping > 0 && aiPrice > 0) {
-          price=aiPrice; shipping=aiShipping; total=aiPrice+aiShipping;
-        } else if(aiShipping > 0 && aiTotal > 0) {
-          shipping=aiShipping; total=aiTotal; price=aiTotal-aiShipping;
-        } else if(aiTotal > 0) {
-          shipping=govShipping; total=aiTotal; price=aiTotal-govShipping;
-        } else if(aiPrice > 0) {
-          shipping=govShipping; total=aiPrice+govShipping; price=aiPrice;
-        } else {
-          shipping=govShipping; price=0; total=0;
-        }
-        const qtyFromTable = lookupQtyByPrice(price, total);
-        return {...c, price, shipping, total_price: total, quantity: qtyFromTable || 1};
-      });
+  // الطلبات الأساسية
+  await runPool(batches.map(idxs => async () => {
+    try { collect(await callAI(idxs), idxs); }
+    catch(e) { lastError = e.message; }
+    doneBatches++; updateProgress();
+  }), CONCURRENCY);
 
-      allExtracted = allExtracted.concat(fixed);
-
-      // تطبيق نوع المنتج العام لو مكتوب
-      const globalProduct = document.getElementById('global-product').value.trim();
-      if(globalProduct) {
-        allExtracted = allExtracted.map(c => ({...c, product_type: globalProduct}));
-      }
-
-      extractedCustomers = allExtracted;
-      renderExtracted();
-    }
-
-    document.getElementById('progress-bar').style.width='100%';
-    document.getElementById('progress-text').textContent=`✅ تم معالجة ${totalBatches} دفعة — ${allExtracted.length} عميل`;
-
-  } catch(err) {
-    document.getElementById('extract-error').innerHTML=`<div class="alert alert-error" style="margin-top:1rem;">❌ خطأ: ${err.message}</div>`;
-  } finally {
-    document.getElementById('extract-btn').disabled=false;
-    document.getElementById('extract-loading').style.display='none';
+  // أي رسالة ماطلعش منها عميل: نعيدها لوحدها مرة تانية
+  const missing = messages.map((_,i)=>i).filter(i => !perMsg.has(i));
+  if(missing.length && !(needOriginal && loose.length)) {
+    document.getElementById('progress-text').textContent = `إعادة محاولة ${missing.length} رسالة...`;
+    await runPool(missing.map(i => async () => {
+      try { collect(await callAI([i]), [i]); } catch(e) { lastError = e.message; }
+    }), CONCURRENCY);
   }
+  const failed = needOriginal ? [] : messages.map((_,i)=>i).filter(i => !perMsg.has(i));
+
+  // تجميع بالترتيب الأصلي وتطبيق الأسعار وعدد القطع
+  const gp = document.getElementById('global-product').value.trim();
+  const fixCustomer = (c, idx) => {
+    const msg = (!needOriginal && idx !== null) ? messages[idx] : (c.original_message || '');
+    const m = {...c}; delete m.msg_index;
+    m.original_message = msg;
+    m.phone = cleanPhones(m.phone, msg);
+    const govShipping = getShipping(m.governorate);
+    const aiPrice    = m.price    || 0;
+    const aiShipping = m.shipping || 0;
+    const aiTotal    = m.total_price || 0;
+    let price, shipping, total;
+    if(aiShipping > 0 && aiPrice > 0) {
+      price=aiPrice; shipping=aiShipping; total=aiPrice+aiShipping;
+    } else if(aiShipping > 0 && aiTotal > 0) {
+      shipping=aiShipping; total=aiTotal; price=aiTotal-aiShipping;
+    } else if(aiTotal > 0) {
+      shipping=govShipping; total=aiTotal; price=aiTotal-govShipping;
+    } else if(aiPrice > 0) {
+      shipping=govShipping; total=aiPrice+govShipping; price=aiPrice;
+    } else {
+      shipping=govShipping; price=0; total=0;
+    }
+    if(gp) m.product_type = gp;
+    const qtyFromTable = lookupQtyByPrice(price, total, m.product_type);
+    return {...m, price, shipping, total_price: total, quantity: qtyFromTable || 1};
+  };
+
+  const allExtracted = [];
+  [...perMsg.keys()].sort((x,y)=>x-y).forEach(i => perMsg.get(i).forEach(c => allExtracted.push(fixCustomer(c, i))));
+  loose.forEach(c => allExtracted.push(fixCustomer(c, null)));
+
+  extractedCustomers = allExtracted;
+  renderExtracted();
+
+  document.getElementById('progress-bar').style.width='100%';
+  document.getElementById('extract-loading').style.display='none';
+  document.getElementById('extract-btn').disabled=false;
+
+  if(failed.length) {
+    const snippets = failed.slice(0,8).map(i => `<li style="margin-bottom:3px;">رسالة ${i+1}: ${messages[i].replace(/\s+/g,' ').slice(0,50)}...</li>`).join('');
+    document.getElementById('extract-error').innerHTML = `<div class="alert alert-error" style="margin-top:1rem;">
+      ⚠️ تم استخراج ${allExtracted.length} عميل من ${messages.length} رسالة، و${failed.length} رسالة ما اتقرتش${lastError ? ' ('+lastError+')' : ''}.
+      <ul style="margin:8px 18px 0;font-size:12.5px;">${snippets}${failed.length>8 ? '<li>...</li>' : ''}</ul>
+      <button class="btn btn-secondary btn-sm" style="margin-top:10px;" onclick="restoreFailedMessages(${JSON.stringify(failed)})">↩️ رجّع الرسائل دي في خانة اللصق</button>
+      <div style="font-size:12px;margin-top:6px;">احفظ العملاء اللي اتستخرجوا الأول، وبعدين استخرج دول.</div>
+    </div>`;
+    window.__lastMessages = messages;
+  }
+}
+function restoreFailedMessages(idxs) {
+  const msgs = window.__lastMessages || [];
+  document.getElementById('msg-input').value = idxs.map(i => msgs[i]).filter(Boolean).join('\n\n');
+  notify('✅ الرسائل رجعت في خانة اللصق');
 }
 function renderExtracted() {
   if(!extractedCustomers.length){
@@ -1087,7 +1153,7 @@ function renderExtracted() {
         <div class="detail-item"><span class="detail-label">🏠 العنوان:</span><span class="detail-value">${c.address||'-'}</span></div>
         <div class="detail-item"><span class="detail-label">📦 المنتج:</span><span class="detail-value">${c.product_type||'-'}</span></div>
         <div class="detail-item"><span class="detail-label">🎨 الطلب:</span><span class="detail-value">${c.color||'-'}</span></div>
-        <div class="detail-item"><span class="detail-label">🔢 عدد القطع:</span><span class="detail-value">${c.quantity||1} قطعة${(c.price>0 && !lookupQtyByPrice(c.price, c.total_price)) ? ' <span title="السعر ده مش مسجل في جدول الأسعار الاسترشادية" style="background:#fff3d6;color:#a05e00;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700;">⚠️ سعر غير مسجل</span>' : ''}</span></div>
+        <div class="detail-item"><span class="detail-label">🔢 عدد القطع:</span><span class="detail-value">${c.quantity||1} قطعة${(c.price>0 && !lookupQtyByPrice(c.price, c.total_price, c.product_type)) ? ' <span title="السعر ده مش مسجل في جدول الأسعار الاسترشادية" style="background:#fff3d6;color:#a05e00;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700;">⚠️ سعر غير مسجل</span>' : ''}</span></div>
         <div class="detail-item"><span class="detail-label">💰 الإجمالي:</span><span class="detail-value"><span class="price-badge">${c.total_price||0} جنيه</span></span></div>
       </div>
     </div>`;
@@ -1100,15 +1166,21 @@ function renderExtracted() {
 }
 
 async function saveAllExtracted() {
-  if(!extractedCustomers.length) return;
+  if(!extractedCustomers.length || window.__saving) return;
+  window.__saving = true;
+  const btn = document.querySelector('#save-all-bar .btn-primary');
+  const label = btn ? btn.textContent : '';
+  if(btn){ btn.disabled = true; btn.textContent = '⏳ جاري الحفظ...'; }
   try {
-    for(const c of extractedCustomers) await sbInsert(c);
-    notify(`✅ تم حفظ ${extractedCustomers.length} عميل بنجاح!`);
+    const n = extractedCustomers.length;
+    await sbInsertMany(extractedCustomers);
+    notify(`✅ تم حفظ ${n} عميل بنجاح!`);
     extractedCustomers=[];
     document.getElementById('extracted-list').innerHTML='';
     document.getElementById('save-all-bar').style.display='none';
     updateTopStats();
   } catch(err){notify('❌ خطأ في الحفظ: '+err.message);}
+  finally { window.__saving = false; if(btn){ btn.disabled = false; btn.textContent = label; } }
 }
 
 function clearMessages() {
@@ -1117,44 +1189,6 @@ function clearMessages() {
   document.getElementById('save-all-bar').style.display='none';
   document.getElementById('extract-error').innerHTML='';
   extractedCustomers=[];
-}
-
-function autoFillShipping() {
-  const gov = document.getElementById('m-gov').value;
-  const shipping = getShipping(gov);
-  document.getElementById('m-shipping').value = shipping;
-  // إعادة حساب الإجمالي تلقائياً
-  const price = parseFloat(document.getElementById('m-price').value)||0;
-  document.getElementById('m-total').value = price + shipping;
-}
-
-// ==================== MANUAL ====================
-function saveManual() {
-  const name=document.getElementById('m-name').value.trim();
-  const phone=document.getElementById('m-phone').value.trim();
-  if(!name||!phone){showAlert('manual-alert','الاسم ورقم التليفون مطلوبان','error');return;}
-  const gov=document.getElementById('m-gov').value.trim()||null;
-  const price=parseFloat(document.getElementById('m-price').value)||0;
-  const shipping=getShipping(gov); // دائماً من القاعدة الثابتة
-  const total=price+shipping;
-  const data={name,phone,
-    governorate:gov,
-    product_type:document.getElementById('m-product').value.trim()||null,
-    color:document.getElementById('m-color').value.trim()||null,
-    size:document.getElementById('m-size').value.trim()||null,
-    quantity:parseInt(document.getElementById('m-qty').value)||1,
-    price,shipping,total_price:total,
-    address:document.getElementById('m-address').value.trim()||null,
-    notes:document.getElementById('m-notes').value.trim()||null
-  };
-  sbInsert(data).then(()=>{
-    showAlert('manual-alert',`تم حفظ العميل "${name}" بنجاح ✅`,'success');
-    clearManual(); updateTopStats();
-  }).catch(err=>showAlert('manual-alert','خطأ: '+err.message,'error'));
-}
-function clearManual() {
-  ['m-name','m-phone','m-gov','m-product','m-color','m-size','m-qty','m-price','m-shipping','m-total','m-address','m-notes']
-    .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
 }
 
 // ==================== RECORDS ====================
@@ -1203,7 +1237,7 @@ function renderRecords(data) {
 
   // كشف أرقام التليفون المكررة
   const phoneCounts={};
-  data.forEach(r=>{ if(r.phone) phoneCounts[r.phone]=(phoneCounts[r.phone]||0)+1; });
+  data.forEach(r=>{ phonesOf(r.phone).forEach(ph=>{ phoneCounts[ph]=(phoneCounts[ph]||0)+1; }); });
 
   let html=`<div class="table-wrapper"><table>
     <thead><tr>
@@ -1213,7 +1247,7 @@ function renderRecords(data) {
     </tr></thead><tbody>`;
   data.forEach((r,i)=>{
     const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('ar-EG') : '-';
-    const isDuplicate = r.phone && phoneCounts[r.phone] > 1;
+    const isDuplicate = phonesOf(r.phone).some(ph=>phoneCounts[ph] > 1);
     const isPrinted = r.printed || printedIds.has(r.id);
     const rowBg = isPrinted ? 'style="background:#e8f0fe;"' : isDuplicate ? 'style="background:#fff8e1;"' : '';
     const dupBadge = isDuplicate ? ' <span style="background:#ff9800;color:white;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700;">مكرر</span>' : '';
@@ -1619,8 +1653,7 @@ async function addToArchiveSheet(archiveId) {
     const archive = rows[0];
 
     // ادمج البيانات القديمة مع الجديدة
-    const addedAt = new Date().toISOString();
-    const mergedData = [...archive.data, ...selected.map(c => ({...c, exported_at: addedAt}))];
+    const mergedData = [...archive.data, ...selected];
 
     // حدّث الأرشيف في قاعدة البيانات
     await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=eq.${archiveId}`, {
@@ -2305,6 +2338,28 @@ async function loadUnprinted() {
   }
 }
 
+// ---- كشف الفواتير المكررة (نفس الاسم أو نفس رقم التليفون) ----
+function normName(n) {
+  return String(n||'').toLowerCase()
+    .replace(/[\u064B-\u0652\u0640]/g,'')
+    .replace(/[أإآ]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي')
+    .replace(/\s+/g,' ').trim();
+}
+function escHtml(t) { return String(t==null?'':t).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
+function findDuplicates(data) {
+  const result = data.map(() => []);
+  for(let i=0;i<data.length;i++) {
+    const ni = normName(data[i].name), pi = phonesOf(data[i].phone);
+    for(let j=0;j<data.length;j++) {
+      if(i===j) continue;
+      const sameName = ni && ni === normName(data[j].name);
+      const samePhone = pi.some(ph => phonesOf(data[j].phone).includes(ph));
+      if(sameName || samePhone) result[i].push({ idx:j, sameName, samePhone });
+    }
+  }
+  return result;
+}
+
 function renderUnprinted(data) {
   const countEl = document.getElementById('unprinted-count');
   if(!data.length) {
@@ -2316,7 +2371,9 @@ function renderUnprinted(data) {
       </div>`;
     return;
   }
-  countEl.textContent = `${data.length} فاتورة لم تُطبع بعد`;
+  const dups = findDuplicates(data);
+  const dupCount = dups.filter(d=>d.length).length;
+  countEl.textContent = `${data.length} فاتورة لم تُطبع بعد` + (dupCount ? ` — ⚠️ ${dupCount} مكررة` : '');
 
   let html=`<div class="table-wrapper"><table>
     <thead><tr>
@@ -2327,7 +2384,9 @@ function renderUnprinted(data) {
 
   data.forEach((r,i)=>{
     const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('ar-EG') : '-';
-    html+=`<tr style="background:#fff8f8;">
+    const d = dups[i];
+    const dupWarn = d.length ? `<div style="flex-basis:100%;margin-top:4px;background:#fff3d6;border:1px solid #f0d9a8;color:#a05e00;border-radius:8px;padding:4px 8px;font-size:11.5px;font-weight:700;line-height:1.6;">⚠️ مكررة مع: ${d.slice(0,3).map(x=>`فاتورة #${x.idx+1} (${escHtml(data[x.idx].name)}) — ${x.sameName && x.samePhone ? 'نفس الاسم والتليفون' : x.sameName ? 'نفس الاسم' : 'نفس التليفون'}`).join('<br>')}${d.length>3 ? `<br>و${d.length-3} أخرى...` : ''}</div>` : '';
+    html+=`<tr style="background:${d.length ? '#fff8e1' : '#fff8f8'};">
       <td><input type="checkbox" class="row-check unprinted-check" data-idx="${i}"></td>
       <td>${i+1}</td>
       <td><strong>${r.name}</strong></td>
@@ -2338,9 +2397,10 @@ function renderUnprinted(data) {
       <td><span class="price-badge">${(r.total_price||0).toLocaleString()} ج</span></td>
       <td><small style="color:var(--text-muted);">${dateStr}</small></td>
       <td>
-        <div class="table-actions">
+        <div class="table-actions" style="flex-wrap:wrap;min-width:150px;">
           <button class="btn btn-primary btn-sm" onclick="printOnePDF(${i})">🖨️ طباعة</button>
           <button class="btn btn-secondary btn-sm" onclick="markOnePrinted(${r.id},${i})">✅ مطبوع</button>
+          ${dupWarn}
         </div>
       </td>
     </tr>`;
@@ -2387,13 +2447,15 @@ async function markUnprintedSelected() {
 }
 
 async function sbMarkPrinted(ids) {
-  for(const id of ids) {
-    await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
+  const CHUNK = 100;
+  for(let i=0;i<ids.length;i+=CHUNK) {
+    const part = ids.slice(i,i+CHUNK);
+    await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=in.(${part.join(',')})`, {
       method:'PATCH',
       headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Content-Type':'application/json'},
       body:JSON.stringify({printed:true})
     });
-    printedIds.add(id);
+    part.forEach(id => printedIds.add(id));
   }
 }
 
@@ -2509,6 +2571,91 @@ async function clearArchive() {
   notify('✅ تم حذف كل الأرشيف');
   loadArchive();
 }
+// ==================== EXPORTED CUSTOMERS (من الأرشيف) ====================
+let exportedAll = [];
+
+async function loadExported() {
+  document.getElementById('exported-loading').style.display='flex';
+  document.getElementById('exported-list').innerHTML='';
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?order=created_at.desc`, {
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+    });
+    if(!r.ok) throw new Error(await r.text());
+    const sheets = await r.json();
+    // نجمّع العملاء: عميل واحد لكل id (أحدث شيت أولاً)، ولو العميل في أكتر من شيت نسجل كلهم
+    const map = new Map();
+    sheets.forEach(sh => {
+      (Array.isArray(sh.data) ? sh.data : []).forEach(c => {
+        if(!c) return;
+        const key = c.id ? 'id:'+c.id : 'np:'+normName(c.name)+'|'+(c.phone||'');
+        if(!map.has(key)) map.set(key, { c, sheets: [] });
+        map.get(key).sheets.push({ id: sh.id, filename: sh.filename, date: sh.export_date });
+      });
+    });
+    exportedAll = [...map.values()];
+    document.getElementById('exported-loading').style.display='none';
+    renderExported();
+  } catch(err) {
+    document.getElementById('exported-loading').style.display='none';
+    document.getElementById('exported-list').innerHTML=`<div class="alert alert-error">❌ خطأ في التحميل</div>`;
+  }
+}
+
+function renderExported() {
+  const q = document.getElementById('exported-search').value.trim();
+  const nq = normName(toEnDigits(q));
+  const dq = toEnDigits(q).replace(/\D/g,'');
+  const rows = !q ? exportedAll : exportedAll.filter(({c}) => {
+    const byName = nq && normName(c.name).includes(nq);
+    const byPhone = dq.length >= 3 && toEnDigits(c.phone||'').replace(/\D/g,'').includes(dq);
+    return byName || byPhone;
+  });
+  const countEl = document.getElementById('exported-count');
+  countEl.textContent = q ? `${rows.length} من ${exportedAll.length} عميل` : `${exportedAll.length} عميل مُصدَّر`;
+
+  if(!rows.length) {
+    document.getElementById('exported-list').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">👥</div>
+        <p>${exportedAll.length ? 'مفيش نتائج للبحث ده' : 'لا يوجد عملاء مُصدَّرون بعد — أي شيت تصدّره بيتحفظ هنا تلقائياً'}</p>
+      </div>`;
+    return;
+  }
+
+  const LIMIT = 300;
+  const shown = rows.slice(0, LIMIT);
+  let html = `<div class="table-wrapper"><table>
+    <thead><tr>
+      <th>#</th><th>الاسم</th><th>التليفون</th><th>المحافظة</th>
+      <th>المنتج</th><th>عدد القطع</th><th>الإجمالي</th><th>الشيت</th>
+    </tr></thead><tbody>`;
+  shown.forEach(({c, sheets}, i) => {
+    const latest = sheets[0];
+    const more = sheets.length > 1
+      ? ` <span title="${escHtml(sheets.map(x=>x.filename).join(' | '))}" style="background:#fff3d6;color:#a05e00;font-size:10px;padding:1px 7px;border-radius:10px;font-weight:700;">+${sheets.length-1} شيت</span>` : '';
+    html += `<tr>
+      <td>${i+1}</td>
+      <td><strong>${escHtml(c.name)}</strong></td>
+      <td>${escHtml(c.phone||'-')}</td>
+      <td><span class="badge badge-green">${escHtml(c.governorate||'-')}</span></td>
+      <td>${escHtml(c.product_type||'-')}</td>
+      <td>${c.quantity||1}</td>
+      <td><span class="price-badge">${(c.total_price||0).toLocaleString()} ج</span></td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+          <span style="font-size:12.5px;font-weight:600;">📊 ${escHtml(latest.filename)}</span>${more}
+          <button class="btn btn-secondary btn-sm" title="تحميل الشيت" onclick="reDownloadExcel(${latest.id})">⬇️</button>
+        </div>
+        <small style="color:var(--text-muted);">${escHtml(latest.date||'')}</small>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  if(rows.length > LIMIT) html += `<p style="text-align:center;color:var(--text-muted);font-size:12.5px;margin-top:12px;">معروض أول ${LIMIT} من ${rows.length} — استخدم البحث للوصول لعميل معين</p>`;
+  document.getElementById('exported-list').innerHTML = html;
+}
+
 // ==================== PRICE → PIECES TABLE ====================
 const PRICE_QTY_KEY = 'price_qty_table';
 
@@ -2522,18 +2669,63 @@ function savePriceQty(list) {
   list.sort((a,b)=>a.price-b.price);
   localStorage.setItem(PRICE_QTY_KEY, JSON.stringify(list));
 }
-// يطابق سعر المنتج أولاً، ولو مفيش يجرب الإجمالي. يرجع null لو مفيش تطابق
-function lookupQtyByPrice(price, total) {
+const PRODUCT_RULES_KEY = 'product_qty_rules';
+function loadProductRules() {
+  try {
+    const t = JSON.parse(localStorage.getItem(PRODUCT_RULES_KEY)||'[]');
+    return Array.isArray(t) ? t.filter(x=>x && x.product && x.qty>0) : [];
+  } catch(e){ return []; }
+}
+function saveProductRules(list) { localStorage.setItem(PRODUCT_RULES_KEY, JSON.stringify(list)); }
+function normProduct(t) { return String(t||'').trim().toLowerCase().replace(/\s+/g,' '); }
+
+// الترتيب: استثناء المنتج + السعر، ثم استثناء المنتج لوحده، ثم الجدول العام (سعر المنتج ثم الإجمالي).
+// يرجع null لو مفيش تطابق
+function lookupQtyByPrice(price, total, product) {
+  const p = parseFloat(price)||0, t = parseFloat(total)||0;
+  const prod = normProduct(product);
+  if(prod) {
+    const rules = loadProductRules().filter(r => { const rp = normProduct(r.product); return rp && (prod === rp || prod.includes(rp)); });
+    const withPrice = rules.find(r => r.price>0 && ((p>0 && r.price===p) || (t>0 && r.price===t)));
+    if(withPrice) return withPrice.qty;
+    const fixed = rules.find(r => !(r.price>0));
+    if(fixed) return fixed.qty;
+  }
   const list = loadPriceQty();
   const hit = v => { const n = parseFloat(v)||0; return n>0 ? list.find(x=>x.price===n) : null; };
-  const m = hit(price) || hit(total);
+  const m = hit(p) || hit(t);
   return m ? m.qty : null;
+}
+function addProductRule() {
+  const product = document.getElementById('pr-product').value.trim();
+  const qty = parseInt(document.getElementById('pr-qty').value)||0;
+  const price = parseFloat(document.getElementById('pr-price').value)||0;
+  if(!product || qty<=0){ notify('⚠️ اكتب المنتج وعدد القطع'); return; }
+  const list = loadProductRules();
+  const ex = list.find(r => normProduct(r.product)===normProduct(product) && (r.price||0)===price);
+  if(ex) ex.qty = qty; else list.push({product, qty, price: price>0 ? price : null});
+  saveProductRules(list);
+  document.getElementById('pr-product').value=''; document.getElementById('pr-qty').value=''; document.getElementById('pr-price').value='';
+  renderPriceQty();
+  notify(ex ? '✅ تم تحديث الاستثناء' : '✅ تم إضافة الاستثناء');
+}
+function deleteProductRule(i) {
+  const list = loadProductRules(); list.splice(i,1); saveProductRules(list); renderPriceQty();
 }
 function renderPriceQty() {
   const list = loadPriceQty();
   const el = document.getElementById('pq-list');
   if(!el) return;
-  document.getElementById('pq-summary').textContent = list.length ? `(${list.length} سعر مسجل)` : '(لسه فاضي)';
+  const rules = loadProductRules();
+  document.getElementById('pq-summary').textContent = (list.length||rules.length) ? `(${list.length} سعر${rules.length ? ' + '+rules.length+' استثناء' : ''})` : '(لسه فاضي)';
+  const dl = document.getElementById('pr-products-list');
+  if(dl) dl.innerHTML = loadProducts().map(n=>`<option value="${String(n).replace(/"/g,'&quot;')}">`).join('');
+  const rl = document.getElementById('pr-list');
+  if(rl) rl.innerHTML = rules.length ? rules.map((r,i)=>`
+    <div style="display:inline-flex;align-items:center;gap:8px;background:var(--accent-light);border:1px solid #f0d9a8;border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;">
+      <span>${r.product}</span>${r.price>0 ? `<span style="color:var(--text-muted);font-weight:600;">بسعر ${r.price.toLocaleString()} ج</span>` : ''}<span style="color:var(--text-muted);">←</span><span style="color:var(--accent-dark);">${r.qty} قطعة</span>
+      <button onclick="deleteProductRule(${i})" title="حذف" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:14px;font-weight:700;line-height:1;padding:0 2px;">✕</button>
+    </div>`).join('') : '<span style="font-size:12.5px;color:var(--text-muted);">مفيش استثناءات.</span>';
   el.innerHTML = list.length ? list.map(x=>`
     <div style="display:inline-flex;align-items:center;gap:8px;background:var(--primary-light);border:1px solid var(--border-strong);border-radius:10px;padding:6px 12px;font-size:13px;font-weight:700;">
       <span>${x.price.toLocaleString()} ج</span><span style="color:var(--text-muted);">←</span><span style="color:var(--primary);">${x.qty} قطعة</span>
@@ -2564,10 +2756,10 @@ function deletePriceQty(price) {
   renderPriceQty();
 }
 function exportPriceQty() {
-  const list = loadPriceQty();
-  if(!list.length){ notify('⚠️ الجدول فاضي'); return; }
+  const list = loadPriceQty(), rules = loadProductRules();
+  if(!list.length && !rules.length){ notify('⚠️ الجدول فاضي'); return; }
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([JSON.stringify(list,null,1)],{type:'application/json'}));
+  a.href = URL.createObjectURL(new Blob([JSON.stringify({prices:list, rules},null,1)],{type:'application/json'}));
   a.download = 'الأسعار-الاسترشادية.json';
   a.click();
   URL.revokeObjectURL(a.href);
@@ -2577,8 +2769,19 @@ function importPriceQty(input) {
   const rd = new FileReader();
   rd.onload = () => {
     try {
-      const incoming = JSON.parse(rd.result);
+      const parsed = JSON.parse(rd.result);
+      const incoming = Array.isArray(parsed) ? parsed : (parsed.prices||[]);
       if(!Array.isArray(incoming)) throw new Error('bad');
+      if(parsed && Array.isArray(parsed.rules)) {
+        const rl = loadProductRules();
+        parsed.rules.forEach(x=>{
+          const qty = parseInt(x.qty), price = parseFloat(x.price)||0;
+          if(!x.product || !(qty>0)) return;
+          const ex = rl.find(y=>normProduct(y.product)===normProduct(x.product) && (y.price||0)===price);
+          if(ex) ex.qty = qty; else rl.push({product:x.product, qty, price: price>0?price:null});
+        });
+        saveProductRules(rl);
+      }
       const list = loadPriceQty();
       incoming.forEach(x=>{
         const price = parseFloat(x.price), qty = parseInt(x.qty);
@@ -2594,16 +2797,12 @@ function importPriceQty(input) {
 }
 // إعادة حساب عدد القطع للعملاء المستخرجين (قبل الحفظ)
 function recalcExtractedQty() {
-  extractedCustomers = extractedCustomers.map(c=>({...c, quantity: lookupQtyByPrice(c.price, c.total_price) || 1}));
+  extractedCustomers = extractedCustomers.map(c=>({...c, quantity: lookupQtyByPrice(c.price, c.total_price, c.product_type) || 1}));
   renderExtracted();
   notify('✅ تم إعادة حساب عدد القطع');
 }
-function autoFillManualQty() {
-  const q = lookupQtyByPrice(document.getElementById('m-price').value, 0);
-  if(q) document.getElementById('m-qty').value = q;
-}
 function autoFillEditQty() {
-  const q = lookupQtyByPrice(document.getElementById('edit-price').value, 0);
+  const q = lookupQtyByPrice(document.getElementById('edit-price').value, 0, document.getElementById('edit-product').value);
   if(q) document.getElementById('edit-qty').value = q;
 }
 
@@ -2636,123 +2835,10 @@ function addProduct() {
   products.push(name);
   saveProductsList(products);
   renderProductDropdown();
+  renderPriceQty();
   document.getElementById('global-product').value = name;
   input.value = '';
   notify('✅ تم إضافة المنتج: '+name);
-}
-
-// ==================== EXPORTED CUSTOMERS ====================
-function escHtmlP(s) {
-  return String(s==null?'':s).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]));
-}
-
-let exportedRows = [];   // كل (عميل × عملية تصدير)
-let exportedView = [];   // بعد البحث
-const EXPORTED_MAX_ROWS = 300;
-const AR_DAY_NAMES = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
-
-function normAr(s) {
-  return String(s==null?'':s).toLowerCase()
-    .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
-    .replace(/[\u064B-\u0652\u0640]/g,'')
-    .replace(/[أإآ]/g,'ا').replace(/ى/g,'ي').replace(/ة/g,'ه')
-    .trim();
-}
-
-async function loadExported() {
-  const loading = document.getElementById('exported-loading');
-  loading.style.display = 'flex';
-  document.getElementById('exported-list').innerHTML = '';
-  try {
-    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?order=created_at.desc`, {
-      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
-    });
-    if(!r.ok) throw new Error(await r.text());
-    const exportsList = await r.json();
-    exportedRows = [];
-    exportsList.forEach(ex => {
-      (ex.data || []).forEach(c => {
-        // لو العميل اتضاف لشيت قديم نستخدم وقت إضافته، وإلا وقت إنشاء الشيت
-        const when = new Date(c.exported_at || ex.created_at);
-        exportedRows.push({ customer:c, filename:ex.filename, when });
-      });
-    });
-    exportedRows.sort((a,b) => b.when - a.when);
-    loading.style.display = 'none';
-    filterExported();
-  } catch(err) {
-    loading.style.display = 'none';
-    document.getElementById('exported-list').innerHTML = `<div class="alert alert-error">❌ خطأ في التحميل: ${escHtmlP(err.message)}</div>`;
-  }
-}
-
-function filterExported() {
-  const nameQ  = normAr(document.getElementById('exported-search-name').value);
-  const phoneQ = normAr(document.getElementById('exported-search-phone').value).replace(/\D/g,'');
-  exportedView = exportedRows.filter(row => {
-    const c = row.customer;
-    if(nameQ  && !normAr(c.name).includes(nameQ)) return false;
-    if(phoneQ && !normAr(c.phone).replace(/\D/g,'').includes(phoneQ)) return false;
-    return true;
-  });
-  renderExported();
-}
-
-function exportedKey(c) { return c.id != null ? 'id:'+c.id : 'p:'+(c.phone||c.name); }
-
-function renderExported() {
-  const countEl = document.getElementById('exported-count');
-  const listEl  = document.getElementById('exported-list');
-  if(!exportedRows.length) {
-    countEl.textContent = '';
-    listEl.innerHTML = `<div class="empty-state"><div class="empty-icon">📤</div><p>لا يوجد عملاء مُصدَّرون بعد — أي عميل تصدّره في شيت Excel سيظهر هنا تلقائياً</p></div>`;
-    return;
-  }
-  // كم مرة اتصدّر كل عميل (على كل البيانات مش النتائج بس)
-  const timesMap = {};
-  exportedRows.forEach(row => { const k = exportedKey(row.customer); timesMap[k] = (timesMap[k]||0) + 1; });
-  const distinct = new Set(exportedView.map(row => exportedKey(row.customer))).size;
-  countEl.textContent = `${distinct} عميل • ${exportedView.length} سجل تصدير`;
-
-  if(!exportedView.length) {
-    listEl.innerHTML = `<div class="alert alert-info">🔍 لا توجد نتائج مطابقة للبحث</div>`;
-    return;
-  }
-  const shown = exportedView.slice(0, EXPORTED_MAX_ROWS);
-  let html = `<div class="table-wrapper"><table>
-    <thead><tr>
-      <th>#</th><th>الاسم</th><th>التليفون</th><th>المحافظة</th><th>المنتج</th><th>الإجمالي</th>
-      <th>يوم التصدير</th><th>تاريخ التصدير</th><th>الشيت</th><th>فاتورة</th>
-    </tr></thead><tbody>`;
-  shown.forEach((row, i) => {
-    const c = row.customer;
-    const day  = AR_DAY_NAMES[row.when.getDay()];
-    const date = row.when.toLocaleDateString('ar-EG', {year:'numeric', month:'long', day:'numeric'});
-    const time = row.when.toLocaleTimeString('ar-EG', {hour:'2-digit', minute:'2-digit'});
-    const times = timesMap[exportedKey(c)];
-    const badge = times > 1 ? ` <span style="background:#ff9800;color:white;font-size:10px;padding:1px 6px;border-radius:10px;font-weight:700;">صُدّر ${times} مرات</span>` : '';
-    html += `<tr>
-      <td>${i+1}</td>
-      <td><strong>${escHtmlP(c.name)}</strong>${badge}</td>
-      <td>${escHtmlP(c.phone||'-')}</td>
-      <td><span class="badge badge-green">${escHtmlP(c.governorate||'-')}</span></td>
-      <td>${escHtmlP(c.product_type||'-')}</td>
-      <td><span class="price-badge">${(c.total_price||0).toLocaleString()} ج</span></td>
-      <td><span class="badge badge-green">${day}</span></td>
-      <td>${date}<br><small style="color:var(--text-muted);">${time}</small></td>
-      <td><small>${escHtmlP(row.filename)}</small></td>
-      <td><button class="btn btn-secondary btn-sm" onclick="showExportedInvoice(${i})">🧾</button></td>
-    </tr>`;
-  });
-  html += '</tbody></table></div>';
-  if(exportedView.length > EXPORTED_MAX_ROWS)
-    html += `<div class="alert alert-info" style="margin-top:10px;">يظهر أحدث ${EXPORTED_MAX_ROWS} سجل من ${exportedView.length} — استخدم البحث لتضييق النتائج</div>`;
-  listEl.innerHTML = html;
-}
-
-function showExportedInvoice(i) {
-  const row = exportedView[i];
-  if(row) showInvoice(row.customer);
 }
 
 async function updateTopStats() {
