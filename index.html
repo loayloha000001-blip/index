@@ -416,7 +416,6 @@
   <div class="topbar-stats">
     <div class="topbar-stat"><span id="stat-total">0</span><small>إجمالي العملاء</small></div>
     <div class="topbar-stat"><span id="stat-today">0</span><small>إضافة اليوم</small></div>
-    <div class="topbar-stat"><span id="stat-revenue">0</span><small>المبيعات (ج)</small></div>
   </div>
 </div>
 
@@ -427,6 +426,7 @@
   <button class="tab-btn" onclick="switchTab('unprinted',this)">🔴 غير مطبوعة</button>
   <button class="tab-btn" onclick="switchTab('archive',this)">🗂️ أرشيف الشيتات</button>
   <button class="tab-btn" onclick="switchTab('exported',this)">👥 المُصدَّرون</button>
+  <button class="tab-btn" onclick="switchTab('shipping',this)">🚚 حالة الشحن</button>
 </div>
 
 <div class="main">
@@ -611,6 +611,31 @@
     </div>
   </div>
 
+  <!-- SHIPPING STATUS PANEL -->
+  <div id="panel-shipping" class="panel">
+    <div class="card">
+      <div class="card-header">
+        <h2><span class="section-icon">🚚</span> حالة شحن الشيتات المُصدَّرة</h2>
+        <span id="ship-count" style="font-size:13px;color:var(--text-muted);font-weight:600;"></span>
+      </div>
+      <div class="card-body">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <div class="form-group" style="flex:2;min-width:220px;margin:0;">
+            <label>الشيت</label>
+            <select class="form-control" id="ship-sheet" onchange="openShipSheet(this.value)"></select>
+          </div>
+          <div class="form-group" style="flex:1;min-width:180px;margin:0;">
+            <label>بحث في الشيت</label>
+            <input class="form-control" id="ship-search" placeholder="🔍 الاسم أو التليفون" oninput="renderShipping()">
+          </div>
+        </div>
+        <div id="ship-loading" class="loading" style="display:none;"><div class="spinner"></div> جاري التحميل...</div>
+        <div id="ship-postponed"></div>
+        <div id="ship-list"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- ARCHIVE PANEL -->
   <div id="panel-archive" class="panel">
     <div class="card">
@@ -754,6 +779,7 @@ let extractedCustomers = [];
 let currentInvoice = null;
 let searchResults = [];
 let allRecords = [];
+let recShown = 150;   // عدد الصفوف المعروضة في السجل (بيزيد بزرار عرض المزيد)
 let selectedIds = new Map(); // id => بيانات العميل الكاملة (يحفظ عبر بحوث مختلفة)
 let printedIds = new Set();  // IDs العملاء الذين تمت طباعة فواتيرهم
 
@@ -782,6 +808,7 @@ function switchTab(tab, btn) {
   if(tab==='search') document.getElementById('search-results').innerHTML='';
   if(tab==='archive') loadArchive();
   if(tab==='exported') loadExported();
+  if(tab==='shipping') loadShipping();
   if(tab==='unprinted') loadUnprinted();
 }
 
@@ -807,12 +834,21 @@ async function sbInsertMany(rows) {
     if(!r.ok){ const e=await r.text(); throw new Error(e); }
   }
 }
-async function sbSelect(filter='') {
-  const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?order=created_at.desc${filter}`, {
-    headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
-  });
-  if(!r.ok) throw new Error(await r.text());
-  return await r.json();
+// يجيب كل الصفوف على دفعات 1000 (السيرفر بيقطع الرد عند 1000 صف). columns: لتقليل حجم النقل
+async function sbSelect(filter='', columns='*') {
+  const PAGE = 1000;
+  let all = [], from = 0;
+  while(true) {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?select=${columns}&order=created_at.desc,id.desc${filter}`, {
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`,'Range-Unit':'items','Range':`${from}-${from+PAGE-1}`}
+    });
+    if(!r.ok) throw new Error(await r.text());
+    const rows = await r.json();
+    all = all.concat(rows);
+    if(rows.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
 }
 async function sbDelete(id) {
   const r = await fetch(`${SUPABASE_URL}/rest/v1/${TABLE}?id=eq.${id}`, {
@@ -1202,7 +1238,7 @@ async function loadRecords() {
     if(from) filter+=`&created_at=gte.${from}T00:00:00`;
     if(to)   filter+=`&created_at=lte.${to}T23:59:59`;
     const data = await sbSelect(filter);
-    allRecords=data;
+    allRecords=data; recShown=150;
     renderRecords(data);
     renderRecordStats(data);
     updateTopStatsFrom(data);
@@ -1221,11 +1257,9 @@ function clearDateFilter() {
 
 function renderRecordStats(data) {
   const total=data.length;
-  const revenue=data.reduce((s,r)=>s+(r.total_price||0),0);
   const govs=[...new Set(data.map(r=>r.governorate).filter(Boolean))].length;
   document.getElementById('records-stats').innerHTML=`
     <div class="stat-card"><div class="stat-val">${total}</div><div class="stat-lbl">إجمالي العملاء</div></div>
-    <div class="stat-card"><div class="stat-val">${revenue.toLocaleString()}</div><div class="stat-lbl">إجمالي المبيعات (جنيه)</div></div>
     <div class="stat-card"><div class="stat-val">${govs}</div><div class="stat-lbl">محافظات مختلفة</div></div>`;
 }
 
@@ -1245,7 +1279,7 @@ function renderRecords(data) {
       <th>#</th><th>الاسم</th><th>التليفون</th><th>المحافظة</th>
       <th>المنتج</th><th>اللون/المقاس</th><th>عدد القطع</th><th>الإجمالي</th><th>إجراءات</th>
     </tr></thead><tbody>`;
-  data.forEach((r,i)=>{
+  data.slice(0, recShown).forEach((r,i)=>{
     const dateStr = r.created_at ? new Date(r.created_at).toLocaleDateString('ar-EG') : '-';
     const isDuplicate = phonesOf(r.phone).some(ph=>phoneCounts[ph] > 1);
     const isPrinted = r.printed || printedIds.has(r.id);
@@ -1263,14 +1297,22 @@ function renderRecords(data) {
       <td>${r.quantity||1}</td>
       <td><span class="price-badge">${(r.total_price||0).toLocaleString()} ج</span></td>
       <td><div class="table-actions">
-        <button class="btn btn-secondary btn-sm" onclick='showInvoice(${JSON.stringify(r)})'>🧾</button>
+        <button class="btn btn-secondary btn-sm" onclick="showInvoice(allRecords[${i}])">🧾</button>
         <button class="btn btn-secondary btn-sm" onclick="openEditRecord(${i})">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="deleteRecord(${r.id},'${r.name.replace(/'/g,"\\'")}')">🗑️</button>
       </div></td>
     </tr>`;
   });
   html+='</tbody></table></div>';
+  if(data.length > recShown) html += `<div style="text-align:center;margin-top:14px;"><button class="btn btn-secondary" onclick="showMoreRecords()">عرض ${Math.min(150, data.length-recShown)} كمان (معروض ${recShown} من ${data.length})</button></div>`;
   document.getElementById('records-table').innerHTML=html;
+}
+function showMoreRecords() {
+  const checked = new Set([...document.querySelectorAll('.rec-check:checked')].map(c=>c.dataset.idx));
+  recShown += 150;
+  renderRecords(allRecords);
+  document.querySelectorAll('.rec-check').forEach(c => { if(checked.has(c.dataset.idx)) c.checked = true; });
+  updateMultiCount();
 }
 
 function toggleRecordChecks(el) {
@@ -1692,9 +1734,13 @@ async function searchCustomers() {
   const name=document.getElementById('search-name').value.trim();
   const phone=document.getElementById('search-phone').value.trim();
   if(!name&&!phone){document.getElementById('search-results').innerHTML='';return;}
+  // الحروف المتشابهة (أ إ آ ا / ة ه / ى ي) بنخليها _ (أي حرف) عشان "احمد" تلاقي "أحمد"
+  const wild = name.replace(/[أإآا]/g,'_').replace(/[ةه]/g,'_').replace(/[ىي]/g,'_');
+  const nameConds = [`name.ilike.*${encodeURIComponent(name)}*`];
+  if(wild !== name) nameConds.push(`name.ilike.*${encodeURIComponent(wild)}*`);
   let filter='';
-  if(name&&phone) filter=`&or=(name.ilike.*${encodeURIComponent(name)}*,phone.ilike.*${encodeURIComponent(phone)}*)`;
-  else if(name) filter=`&name=ilike.*${encodeURIComponent(name)}*`;
+  if(name&&phone) filter=`&or=(${nameConds.join(',')},phone.ilike.*${encodeURIComponent(phone)}*)`;
+  else if(name) filter = nameConds.length>1 ? `&or=(${nameConds.join(',')})` : `&${nameConds[0].replace('.ilike.','=ilike.')}`;
   else filter=`&phone=ilike.*${encodeURIComponent(phone)}*`;
   try{
     searchResults=await sbSelect(filter);
@@ -1855,6 +1901,11 @@ function buildMultiPagePDF(customers) {
   const ids = customers.filter(c=>c.id).map(c=>c.id);
   if(ids.length) sbMarkPrinted(ids).then(()=>{
     if(allRecords.length) renderRecords(allRecords);
+    if(unprintedRecords.length) {
+      const done = new Set(ids);
+      unprintedRecords = unprintedRecords.filter(r => !done.has(r.id));
+      renderUnprinted(unprintedRecords);
+    }
   });
 
   const date=new Date().toLocaleDateString('ar-EG',{year:'numeric',month:'long',day:'numeric'});
@@ -2347,17 +2398,21 @@ function normName(n) {
 }
 function escHtml(t) { return String(t==null?'':t).replace(/[&<>"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch])); }
 function findDuplicates(data) {
-  const result = data.map(() => []);
-  for(let i=0;i<data.length;i++) {
-    const ni = normName(data[i].name), pi = phonesOf(data[i].phone);
-    for(let j=0;j<data.length;j++) {
-      if(i===j) continue;
-      const sameName = ni && ni === normName(data[j].name);
-      const samePhone = pi.some(ph => phonesOf(data[j].phone).includes(ph));
-      if(sameName || samePhone) result[i].push({ idx:j, sameName, samePhone });
-    }
-  }
-  return result;
+  // تجميع بالاسم وبالرقم في خطوة واحدة (سريع حتى مع آلاف الفواتير)
+  const names = data.map(r => normName(r.name));
+  const phones = data.map(r => phonesOf(r.phone));
+  const byName = new Map(), byPhone = new Map();
+  const push = (m, k, i) => { let a = m.get(k); if(!a) m.set(k, a = []); a.push(i); };
+  data.forEach((_, i) => { if(names[i]) push(byName, names[i], i); phones[i].forEach(ph => push(byPhone, ph, i)); });
+  return data.map((_, i) => {
+    const flags = new Map();
+    if(names[i]) byName.get(names[i]).forEach(j => { if(j !== i) flags.set(j, { idx:j, sameName:true, samePhone:false }); });
+    phones[i].forEach(ph => byPhone.get(ph).forEach(j => {
+      if(j === i) return;
+      const f = flags.get(j); if(f) f.samePhone = true; else flags.set(j, { idx:j, sameName:false, samePhone:true });
+    }));
+    return [...flags.values()].sort((x, y) => x.idx - y.idx);
+  });
 }
 
 function renderUnprinted(data) {
@@ -2645,7 +2700,6 @@ function renderExported() {
       <td>
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <span style="font-size:12.5px;font-weight:600;">📊 ${escHtml(latest.filename)}</span>${more}
-          <button class="btn btn-secondary btn-sm" title="تحميل الشيت" onclick="reDownloadExcel(${latest.id})">⬇️</button>
         </div>
         <small style="color:var(--text-muted);">${escHtml(latest.date||'')}</small>
       </td>
@@ -2654,6 +2708,265 @@ function renderExported() {
   html += '</tbody></table></div>';
   if(rows.length > LIMIT) html += `<p style="text-align:center;color:var(--text-muted);font-size:12.5px;margin-top:12px;">معروض أول ${LIMIT} من ${rows.length} — استخدم البحث للوصول لعميل معين</p>`;
   document.getElementById('exported-list').innerHTML = html;
+}
+
+// ==================== SHIPPING STATUS (حالة الشحن لكل عميل في الشيت) ====================
+// الحالة بتتحفظ جوه بيانات الشيت نفسه في الأرشيف (مفيش أعمدة جديدة في القاعدة)
+const SHIP_STATUSES = ['تم الاستلام','استلام جزئي','عهدة','تم التواصل مع العميل','تدوير لبكره','عدم رد','لاغي','تأجيل ليوم محدد','رفض ودفع','رفض ورفض'];
+const SHIP_POSTPONE = 'تأجيل ليوم محدد';
+// حالات محتاجة متابعة: بتظهر بلون مختلف
+const SHIP_FOLLOWUP = ['تدوير لبكره','تأجيل ليوم محدد','تم التواصل مع العميل','عهدة'];
+const WEEKDAYS_AR = ['الأحد','الاثنين','الثلاثاء','الأربعاء','الخميس','الجمعة','السبت'];
+
+function isoLocal(d) { return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function fmtDayMonth(d) { return d.toLocaleDateString('ar-EG',{day:'numeric',month:'long'}); }
+// أيام الأسبوع الجاية (من بكره لحد 7 أيام): "السبت القادم — ٢٨ نوفمبر"
+function nextWeekdayOptions() {
+  const now = new Date(), out = [];
+  for(let k=1;k<=7;k++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate()+k);
+    out.push({ value: isoLocal(d), label: `${WEEKDAYS_AR[d.getDay()]} ${d.getDay()===5 ? 'القادمة' : 'القادم'} — ${fmtDayMonth(d)}` });
+  }
+  return out;
+}
+function postponeOptionsFor(saved) {
+  const opts = nextWeekdayOptions();
+  if(saved && !opts.some(o => o.value === saved)) {
+    const d = new Date(saved + 'T00:00:00');
+    if(!isNaN(d)) opts.unshift({ value: saved, label: `${WEEKDAYS_AR[d.getDay()]} ${fmtDayMonth(d)}${saved < isoLocal(new Date()) ? ' (فات)' : ''}` });
+  }
+  return opts;
+}
+let shipId = null;    // الشيت المفتوح
+let shipData = [];    // عملاء الشيت المفتوح
+
+async function loadShipping() {
+  document.getElementById('ship-loading').style.display='flex';
+  try {
+    // قائمة الشيتات بدون بياناتها (خفيفة)
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?select=id,filename,export_date,day_name,records_count&order=created_at.desc,id.desc`, {
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+    });
+    if(!r.ok) throw new Error(await r.text());
+    const sheets = await r.json();
+    const sel = document.getElementById('ship-sheet');
+    if(!sheets.length) {
+      sel.innerHTML = '';
+      document.getElementById('ship-loading').style.display='none';
+      document.getElementById('ship-count').textContent = '';
+      document.getElementById('ship-list').innerHTML = `<div class="empty-state"><div class="empty-icon">🚚</div><p>لا يوجد شيتات مُصدَّرة بعد — أي شيت تصدّره بيظهر هنا</p></div>`;
+      shipId = null; shipData = [];
+      return;
+    }
+    sel.innerHTML = sheets.map(x => `<option value="${x.id}">${escHtml(x.filename)} — ${escHtml(x.export_date||'')} (${x.records_count||0} عميل)</option>`).join('');
+    const keep = sheets.some(x => x.id === shipId) ? shipId : sheets[0].id;
+    sel.value = String(keep);
+    await openShipSheet(keep);
+  } catch(err) {
+    document.getElementById('ship-loading').style.display='none';
+    document.getElementById('ship-list').innerHTML = `<div class="alert alert-error">❌ خطأ في التحميل</div>`;
+  }
+}
+
+async function openShipSheet(id) {
+  id = parseInt(id);
+  document.getElementById('ship-loading').style.display='flex';
+  document.getElementById('ship-list').innerHTML='';
+  try {
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=eq.${id}&select=data`, {
+      headers:{'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`}
+    });
+    if(!r.ok) throw new Error(await r.text());
+    const rows = await r.json();
+    shipId = id;
+    shipData = (rows[0] && Array.isArray(rows[0].data)) ? rows[0].data : [];
+    document.getElementById('ship-loading').style.display='none';
+    renderShipping();
+  } catch(err) {
+    document.getElementById('ship-loading').style.display='none';
+    document.getElementById('ship-list').innerHTML = `<div class="alert alert-error">❌ خطأ في تحميل الشيت</div>`;
+  }
+}
+
+function shipLevel(c) {
+  if(!c.shipping_status) return 'none';
+  if(c.shipping_status === SHIP_POSTPONE && !c.postpone_date) return 'none';
+  return SHIP_FOLLOWUP.includes(c.shipping_status) ? 'follow' : 'normal';
+}
+function shipCounts() {
+  let none = 0, follow = 0;
+  shipData.forEach(c => { if(!c) return; const l = shipLevel(c); if(l==='none') none++; else if(l==='follow') follow++; });
+  return { none, follow };
+}
+function shipCountText() {
+  const k = shipCounts();
+  return `${shipData.length} عميل` + (k.none ? ` — ⚠️ ${k.none} بدون حالة` : '') + (k.follow ? ` — 🔔 ${k.follow} متابعة` : '');
+}
+
+function renderShipping() {
+  const q = document.getElementById('ship-search').value.trim();
+  const nq = normName(toEnDigits(q));
+  const dq = toEnDigits(q).replace(/\D/g,'');
+  const items = [];
+  shipData.forEach((c, i) => {
+    if(!c) return;
+    if(q) {
+      const byName = nq && normName(c.name).includes(nq);
+      const byPhone = dq.length >= 3 && toEnDigits(c.phone||'').replace(/\D/g,'').includes(dq);
+      if(!byName && !byPhone) return;
+    }
+    items.push([c, i]);
+  });
+  document.getElementById('ship-count').textContent = shipCountText();
+  renderPostponedInvoices();
+  if(!items.length) {
+    document.getElementById('ship-list').innerHTML = `<div class="empty-state"><div class="empty-icon">🚚</div><p>${shipData.length ? 'مفيش نتائج للبحث ده' : 'الشيت فاضي'}</p></div>`;
+    return;
+  }
+  const todayIso = isoLocal(new Date());
+  let html = `<div class="table-wrapper"><table>
+    <thead><tr><th>#</th><th>الاسم</th><th>التليفون</th><th>المنتج</th><th>عدد القطع</th><th>السعر</th><th>حالة الشحن</th></tr></thead><tbody>`;
+  items.forEach(([c, i], n) => {
+    const lvl = shipLevel(c);
+    const selStyle = lvl==='none' ? 'background:#fdecea;border-color:#e74c3c;color:#a8281c;'
+                   : lvl==='follow' ? 'background:#fff3d6;border-color:#f0b429;color:#8a5a00;' : '';
+    let tag = '';
+    if(!c.shipping_status) tag = `<span style="color:#a8281c;font-size:11.5px;font-weight:700;">⚠️ بدون حالة</span>`;
+    else if(c.shipping_status === SHIP_POSTPONE && !c.postpone_date) tag = `<span style="color:#a8281c;font-size:11.5px;font-weight:700;">⚠️ اختار اليوم</span>`;
+    else if(c.shipping_status === SHIP_POSTPONE && c.postpone_date < todayIso) tag = `<span style="color:#a8281c;font-size:11.5px;font-weight:700;">⏰ فات الميعاد</span>`;
+    else if(lvl==='follow') tag = `<span style="color:#8a5a00;font-size:11.5px;font-weight:700;">🔔 متابعة</span>`;
+    const statusOpts = (c.shipping_status && !SHIP_STATUSES.includes(c.shipping_status) ? [c.shipping_status] : []).concat(SHIP_STATUSES)
+      .map(st => `<option value="${escHtml(st)}"${st===c.shipping_status?' selected':''}>${escHtml(st)}</option>`).join('');
+    const daySel = c.shipping_status === SHIP_POSTPONE ? `
+          <select class="form-control ship-day" data-i="${i}" onchange="saveShipChange(${i}, {day:this.value}, this)" style="min-width:140px;margin-top:6px;${c.postpone_date ? 'background:#fff3d6;border-color:#f0b429;' : 'background:#fdecea;border-color:#e74c3c;'}">
+            <option value="">— اختر اليوم —</option>
+            ${postponeOptionsFor(c.postpone_date).map(o => `<option value="${o.value}"${o.value===c.postpone_date?' selected':''}>${escHtml(o.label)}</option>`).join('')}
+          </select>` : '';
+    html += `<tr>
+      <td>${n+1}</td>
+      <td>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <strong>${escHtml(c.name)}</strong>
+          <button class="btn btn-secondary btn-sm ship-copy" title="نسخ بيانات الفاتورة" onclick="copyShipCustomer(${i}, this)" style="padding:3px 8px;">📋</button>
+        </div>
+      </td>
+      <td>${escHtml(c.phone||'-')}</td>
+      <td>${escHtml(c.product_type||'-')}</td>
+      <td>${c.quantity||1}</td>
+      <td><span class="price-badge">${(c.total_price||0).toLocaleString()} ج</span></td>
+      <td style="min-width:180px;">
+        <div style="display:flex;align-items:center;gap:6px;">
+          <select class="form-control ship-status" data-i="${i}" onchange="saveShipChange(${i}, {status:this.value}, this)" style="min-width:140px;${selStyle}">
+            <option value="">— اختر الحالة —</option>
+            ${statusOpts}
+          </select>
+          <span class="ship-mark" style="font-size:13px;min-width:16px;"></span>
+        </div>
+        ${daySel}
+        ${tag ? `<div style="margin-top:4px;">${tag}</div>` : ''}
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  document.getElementById('ship-list').innerHTML = html;
+}
+
+// بيقرأ الشيت من جديد قبل الحفظ ويغيّر العميل ده بس، عشان ما يمسحش تعديل حد تاني
+async function saveShipChange(i, patch, el) {
+  const mark = el.closest('td').querySelector('.ship-mark');
+  const cust = shipData[i];
+  if(mark) mark.textContent = '⏳';
+  try {
+    const h = {'apikey':SUPABASE_KEY,'Authorization':`Bearer ${SUPABASE_KEY}`};
+    const r = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=eq.${shipId}&select=data`, {headers:h});
+    if(!r.ok) throw new Error(await r.text());
+    const rows = await r.json();
+    if(!rows.length) throw new Error('الشيت اتحذف');
+    const fresh = Array.isArray(rows[0].data) ? rows[0].data : [];
+    let j = cust && cust.id ? fresh.findIndex(c => c && c.id === cust.id) : i;
+    if(j < 0) j = i;
+    if(!fresh[j]) throw new Error('العميل مش موجود في الشيت');
+    if('status' in patch) {
+      const v = (patch.status||'').trim();
+      if(v) fresh[j].shipping_status = v; else delete fresh[j].shipping_status;
+      if(v !== SHIP_POSTPONE) delete fresh[j].postpone_date;
+    }
+    if('day' in patch) {
+      if(patch.day) fresh[j].postpone_date = patch.day; else delete fresh[j].postpone_date;
+    }
+    const w = await fetch(`${SUPABASE_URL}/rest/v1/${ARCHIVE_TABLE}?id=eq.${shipId}`, {
+      method:'PATCH', headers:{...h,'Content-Type':'application/json'}, body:JSON.stringify({data: fresh})
+    });
+    if(!w.ok) throw new Error(await w.text());
+    shipData = fresh;
+    renderShipping();  // عشان اللون والتنبيه واختيار اليوم يتحدثوا
+    const m2 = document.querySelector(`#ship-list .ship-status[data-i="${i}"]`);
+    const mk = m2 && m2.parentElement.querySelector('.ship-mark');
+    if(mk) { mk.textContent = '✅'; setTimeout(() => { if(mk.textContent==='✅') mk.textContent=''; }, 2000); }
+  } catch(err) {
+    if(mark) mark.textContent = '❌';
+    notify('❌ ماتحفظتش: ' + err.message);
+  }
+}
+
+// فواتير التأجيل: أي عميل حالته تأجيل وليه يوم محدد بتظهر له فاتورة جديدة قابلة للنسخ ويوم التأجيل جنبها
+function postponeDayLabel(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  return isNaN(d) ? iso : `${WEEKDAYS_AR[d.getDay()]} ${fmtDayMonth(d)}`;
+}
+function renderPostponedInvoices() {
+  const box = document.getElementById('ship-postponed');
+  const list = [];
+  shipData.forEach((c, i) => { if(c && c.shipping_status === SHIP_POSTPONE && c.postpone_date) list.push([c, i]); });
+  if(!list.length) { box.innerHTML = ''; return; }
+  list.sort((a, b) => a[0].postpone_date.localeCompare(b[0].postpone_date));
+  const todayIso = isoLocal(new Date());
+  box.innerHTML = `<details open style="margin-bottom:18px;">
+    <summary style="cursor:pointer;font-weight:700;font-size:14.5px;margin-bottom:10px;">📅 فواتير التأجيل (${list.length})</summary>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;">
+    ${list.map(([c, i]) => `
+      <div class="ship-postponed-card" data-i="${i}" style="border:1px solid #f0b429;background:#fffbea;border-radius:12px;padding:12px;">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">
+          <div>
+            <strong>${escHtml(c.name)}</strong><br>
+            <span style="display:inline-block;margin-top:4px;background:#fff3d6;border:1px solid #f0b429;color:#8a5a00;border-radius:10px;padding:1px 9px;font-size:12px;font-weight:700;">📅 تأجيل ليوم: ${escHtml(postponeDayLabel(c.postpone_date))}</span>
+            ${c.postpone_date < todayIso ? '<span style="color:#a8281c;font-size:11.5px;font-weight:700;"> ⏰ فات الميعاد</span>' : ''}
+          </div>
+          <button class="btn btn-secondary btn-sm ship-copy" title="نسخ بيانات الفاتورة" onclick="copyShipCustomer(${i}, this)" style="padding:3px 8px;">📋</button>
+        </div>
+        <pre style="margin:0;white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:13px;line-height:1.8;user-select:text;">${escHtml(shipInvoiceText(c))}</pre>
+      </div>`).join('')}
+    </div>
+  </details>`;
+}
+
+// نص بيانات الفاتورة كاملة للنسخ
+function shipInvoiceText(c) {
+  const money = v => (v||0).toLocaleString() + ' جنيه';
+  const lines = [
+    ['الاسم', c.name], ['رقم التليفون', c.phone], ['العنوان', c.address], ['المحافظة', c.governorate],
+    ['المنتج', c.product_type], ['اللون', c.color], ['المقاس', c.size], ['عدد القطع', c.quantity||1],
+    ['السعر', money(c.price)], ['الشحن', money(c.shipping)], ['الإجمالي', money(c.total_price)], ['ملاحظات', c.notes],
+    ['يوم التأجيل', (c.shipping_status === SHIP_POSTPONE && c.postpone_date) ? postponeDayLabel(c.postpone_date) : '']
+  ];
+  return lines.filter(([,v]) => v !== undefined && v !== null && String(v).trim() !== '').map(([k,v]) => `${k}: ${v}`).join('\n');
+}
+async function copyShipCustomer(i, btn) {
+  const c = shipData[i]; if(!c) return;
+  const text = shipInvoiceText(c);
+  try {
+    if(navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+    else throw new Error('fallback');
+  } catch(e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch(e2) {}
+    document.body.removeChild(ta);
+  }
+  const old = btn.textContent; btn.textContent = '✅';
+  setTimeout(() => { btn.textContent = old; }, 1500);
+  notify('✅ تم نسخ بيانات الفاتورة');
 }
 
 // ==================== PRICE → PIECES TABLE ====================
@@ -2842,14 +3155,12 @@ function addProduct() {
 }
 
 async function updateTopStats() {
-  try{const data=await sbSelect();updateTopStatsFrom(data);}catch(e){}
+  try{const data=await sbSelect('', 'created_at');updateTopStatsFrom(data);}catch(e){}
 }
 function updateTopStatsFrom(data) {
   document.getElementById('stat-total').textContent=data.length;
   const today=new Date().toISOString().slice(0,10);
   document.getElementById('stat-today').textContent=data.filter(r=>r.created_at&&r.created_at.startsWith(today)).length;
-  const rev=data.reduce((s,r)=>s+(r.total_price||0),0);
-  document.getElementById('stat-revenue').textContent=rev.toLocaleString()+' ج';
 }
 
 // ==================== INIT ====================
